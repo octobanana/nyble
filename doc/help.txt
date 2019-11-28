@@ -1,0 +1,112 @@
+nyble
+  A snake game for the terminal.
+
+Usage
+  nyble
+  nyble [--colour=<on|off|auto>] -h|--help
+  nyble [--colour=<on|off|auto>] -v|--version
+  nyble [--colour=<on|off|auto>] --license
+
+Options
+  --colour=<on|off|auto>
+    Print the program output with colour either on, off, or auto based on if
+    stdout is a tty, the default value is 'auto'.
+  -h, --help
+    Print the help output.
+  --license
+    Print the program license.
+  -v, --version
+    Print the program version.
+
+Key Bindings
+  q, Q, <ctrl-c>
+    quit the program
+  :
+    enter the command prompt
+  <space>
+    start/pause the game
+  r
+    restart the game
+  ,
+    move left, 2 key mode
+  .
+    move right, 2 key mode
+  <up>
+    move up
+  <down>
+    move down
+  <left>
+    move left
+  <right>
+    move right
+  w
+    move up
+  s
+    move down
+  a
+    move left
+  d
+    move right
+  k
+    move up
+  j
+    move down
+  h
+    move left
+  l
+    move right
+
+Prompt Bindings
+  <esc>, <ctrl-c>
+    exit the prompt
+  <enter>
+    submit the input
+  <ctrl-u>
+    clear the prompt
+  <up>, <ctrl-p>
+    previous history value based on current input
+  <down>, <ctrl-n>
+    next history value based on current input
+  <left>, <ctrl-b>
+    move cursor left
+  <right>, <ctrl-f>
+    move cursor right
+  <home>, <ctrl-a>
+    move cursor to the start of the input
+  <end>, <ctrl-e>
+    move cursor to the end of the input
+  <delete>, <ctrl-d>
+    delete character under the cursor or delete previous character if cursor is
+    at the end of the input
+  <backspace>, <ctrl-h>
+    delete previous character
+
+Examples
+  nyble
+    run the program
+  nyble --help --colour=off
+    print the help output, without colour
+  nyble --help
+    print the help output
+  nyble --version
+    print the program version
+  nyble --license
+    print the program license
+
+Exit Codes
+  0
+    normal
+  1
+    error
+
+Meta
+  The version format is 'major.minor.patch (day.month.year)'.
+
+Repository
+  https://github.com/octobanana/nyble.git
+
+Homepage
+  https://octobanana.com/software/nyble
+
+Author
+  Brett Robinson (octobanana) <octobanana.dev@gmail.com>
