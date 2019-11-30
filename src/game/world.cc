@@ -488,59 +488,42 @@ void World::lang() {
     return Xpr{Lst{num_xpr(static_cast<Int>(_egg.pos.x)), num_xpr(static_cast<Int>(_egg.pos.y))}};
   }}, _env, Val::evaled};
 
-  (*_env)["key"] = Val{Fun{str_lst("(a @)"), [&](auto e) -> Xpr {
+  (*_env)["key"] = Val{Fun{str_lst("(a b)"), [&](auto e) -> Xpr {
     auto a = eval(sym_xpr("a"), e);
     if (auto const s = xpr_str(&a)) {
-      if (s->size() != 1) {
-        throw std::runtime_error("expected exactly one 'Str' character");
+      if (s->size() == 1) {
+        auto key = OB::Term::utf8_to_char32(s->front());
+        _input_key[key] = eval(sym_xpr("b"), e);
+        return a;
       }
-      auto key = OB::Term::utf8_to_char32(s->front());
-      auto x = eval(sym_xpr("@"), e);
-      auto& l = std::get<Lst>(x);
-      std::vector<Fn*> fns;
-      for (auto it = l.begin(); it != l.end(); ++it) {
-        auto x = eval(*it, e->current);
-        if (auto const f = xpr_str(&x)) {
-          if (auto const v = _fn.find(f->str()); v != _fn.end()) {
-            fns.emplace_back(&v->second);
-          }
-          else {
-            throw std::runtime_error("invalid function '" + f->str() + "'");
-          }
-        }
-        else {
-          throw std::runtime_error("invalid type '" + typ_str.at(type(a)) + "'");
+      else if (s->size() > 1) {
+        if (auto const p = Belle::IO::Read::Key::map.find(s->str()); p != Belle::IO::Read::Key::map.end()) {
+          _input_key[p->second] = eval(sym_xpr("b"), e);
+          return a;
         }
       }
-      _input_play[key] = [fns = std::move(fns)] {
-        for (auto* fn : fns) {(*fn)();}
-      };
-      return a;
+      throw std::runtime_error("invalid key '" + s->str() + "'");
     }
     throw std::runtime_error("invalid type '" + typ_str.at(type(a)) + "'");
   }}, _env, Val::evaled};
 
-  (*_env)["coil"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
-    _fn["coil"]();
+  (*_env)["quit"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
+    _io.stop();
     return sym_xpr("T");
   }}, _env, Val::evaled};
-}
 
-void World::fn_init() {
-  _fn["quit"] = [&] {
-    _io.stop();
-  };
-
-  _fn["sigint"] = [&] {
+  (*_env)["sigint"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     std::cout << aec::erase_down << std::flush;
     kill(getpid(), SIGINT);
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["refresh"] = [&] {
+  (*_env)["refresh"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     game_redraw();
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["prompt"] = [&] {
+  (*_env)["prompt"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     // pause
     _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
     _timer.cancel();
@@ -551,15 +534,17 @@ void World::fn_init() {
     _buf << win_cursor({0, 0});
     _buf << _readline.clear().refresh().render();
     buf_print();
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["restart"] = [&] {
+  (*_env)["restart"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
     _timer.cancel();
     game_init();
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["coil"] = [&] {
+  (*_env)["coil"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     _snake.ext += _snake.pos.size() - 1;
     buf_clear();
     while (_snake.pos.size() > 1) {
@@ -567,9 +552,10 @@ void World::fn_init() {
       _snake.pos.pop_back();
     }
     buf_print();
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["help"] = [&] {
+  (*_env)["help"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
     _timer.cancel();
     std::cout << aec::mouse_disable << aec::nl << aec::screen_pop << aec::cursor_show << std::flush;
@@ -578,9 +564,10 @@ void World::fn_init() {
     _term_mode.set_raw();
     std::cout << aec::cursor_hide << aec::screen_push << aec::cursor_hide << aec::mouse_enable << aec::screen_clear << aec::cursor_home << std::flush;
     game_redraw();
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["pause"] = [&] {
+  (*_env)["pause"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if (_timer.expiry() == (std::chrono::high_resolution_clock::time_point::min)()) {
       buf_clear();
       _buf << win_cursor({0, 0});
@@ -592,9 +579,10 @@ void World::fn_init() {
       _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
       _timer.cancel();
     }
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["left2"] = [&] {
+  (*_env)["left2"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     Snake::Dir dir;
     if (_snake.dir.size()) {dir = _snake.dir.back();}
     else {dir = _snake.dir_prev;}
@@ -616,9 +604,10 @@ void World::fn_init() {
         break;
       }
     }
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["right2"] = [&] {
+  (*_env)["right2"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     Snake::Dir dir;
     if (_snake.dir.size()) {dir = _snake.dir.back();}
     else {dir = _snake.dir_prev;}
@@ -640,65 +629,36 @@ void World::fn_init() {
         break;
       }
     }
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["up"] = [&] {
+  (*_env)["up"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if ((_snake.dir.empty() && _snake.dir_prev != Snake::up) || (_snake.dir.size() && _snake.dir.back() != Snake::up)) {
       _snake.dir.emplace_back(Snake::up);
     }
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["down"] = [&] {
+  (*_env)["down"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if ((_snake.dir.empty() && _snake.dir_prev != Snake::down) || (_snake.dir.size() && _snake.dir.back() != Snake::down)) {
       _snake.dir.emplace_back(Snake::down);
     }
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["left"] = [&] {
+  (*_env)["left"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if ((_snake.dir.empty() && _snake.dir_prev != Snake::left) || (_snake.dir.size() && _snake.dir.back() != Snake::left)) {
       _snake.dir.emplace_back(Snake::left);
     }
-  };
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 
-  _fn["right"] = [&] {
+  (*_env)["right"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if ((_snake.dir.empty() && _snake.dir_prev != Snake::right) || (_snake.dir.size() && _snake.dir.back() != Snake::right)) {
       _snake.dir.emplace_back(Snake::right);
     }
-  };
-}
-
-void World::input_play_init() {
-  _input_play['q'] = _fn["quit"];
-  _input_play[Term::ctrl_key('c')] = _fn["sigint"];
-  _input_play[Term::ctrl_key('l')] = _fn["refresh"];
-  _input_play[':'] = _fn["prompt"];
-  _input_play['r'] = _fn["restart"];
-  _input_play['z'] = _fn["coil"];
-  _input_play['?'] = _fn["help"];
-  _input_play[Key::Space] = _fn["pause"];
-  _input_play[','] = _fn["left2"];
-  _input_play['.'] = _fn["right2"];
-  _input_play[Key::Up] = _fn["up"];
-  _input_play['w'] = _fn["up"];
-  _input_play['k'] = _fn["up"];
-  _input_play[Key::Down] = _fn["down"];
-  _input_play['s'] = _fn["down"];
-  _input_play['j'] = _fn["down"];
-  _input_play[Key::Left] = _fn["left"];
-  _input_play['a'] = _fn["left"];
-  _input_play['h'] = _fn["left"];
-  _input_play[Key::Right] = _fn["right"];
-  _input_play['d'] = _fn["right"];
-  _input_play['l'] = _fn["right"];
-}
-
-void World::input_play(Belle::IO::Read::Ctx const& ctx) {
-  auto const pkey = std::get_if<Key>(&ctx);
-  if (!pkey) {return;}
-
-  if (auto const v = _input_play.find(pkey->ch); v != _input_play.end()) {
-    v->second();
-  }
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
 }
 
 void World::input_prompt(Belle::IO::Read::Ctx const& ctx) {
@@ -718,13 +678,13 @@ void World::input_prompt(Belle::IO::Read::Ctx const& ctx) {
       try {
         if (auto x = read(input)) {
           auto v = eval(*x, _env);
-          auto const res = cprint(v);
+          auto const res = print(v);
           Text::View vres {res};
           _buf << win_cursor({0, 0}) << aec::erase_line << aec::fg_green_bright << ">" << aec::clear << vres.colstr(0, _win_width - 1);
         }
       }
       catch (std::exception const& e) {
-        auto const res = cprint(*read("(err \""s + e.what() + "\")"s));
+        auto const res = print(*read("(err \""s + e.what() + "\")"s));
         Text::View vres {res};
         _buf << win_cursor({0, 0}) << aec::erase_line << aec::fg_red << ">" << aec::clear << vres.colstr(0, _win_width - 1);
       }
@@ -743,9 +703,16 @@ void World::input_prompt(Belle::IO::Read::Ctx const& ctx) {
   buf_print();
 }
 
+void World::input_play(Belle::IO::Read::Ctx const& ctx) {
+  auto const pkey = std::get_if<Key>(&ctx);
+  if (!pkey) {return;}
+  if (auto const v = _input_key.find(pkey->ch); v != _input_key.end()) {
+    eval(v->second, _env);
+  }
+}
+
 void World::input() {
-  // debug
-  _readline.hist_load("./history.txt");
+  _readline.hist_load("./history.txt"); // debug
   _readline.style("");
   _readline.prompt(">", aec::fg_magenta_bright);
   _readline.refresh();
@@ -758,8 +725,28 @@ void World::input() {
     return values;
   });
 
-  fn_init();
-  input_play_init();
+  _input_key['q'] = *read("(quit)");
+  _input_key[Term::ctrl_key('c')] = *read("(sigint)");
+  _input_key[Term::ctrl_key('l')] = *read("(refresh)");
+  _input_key[':'] = *read("(prompt)");
+  _input_key['r'] = *read("(restart)");
+  _input_key['z'] = *read("(coil)");
+  _input_key['?'] = *read("(help)");
+  _input_key[Key::Space] = *read("(pause)");
+  _input_key[','] = *read("(left2)");
+  _input_key['.'] = *read("(right2)");
+  _input_key[Key::Up] = *read("(up)");
+  _input_key['w'] = *read("(up)");
+  _input_key['k'] = *read("(up)");
+  _input_key[Key::Down] = *read("(down)");
+  _input_key['s'] = *read("(down)");
+  _input_key['j'] = *read("(down)");
+  _input_key[Key::Left] = *read("(left)");
+  _input_key['a'] = *read("(left)");
+  _input_key['h'] = *read("(left)");
+  _input_key[Key::Right] = *read("(right)");
+  _input_key['d'] = *read("(right)");
+  _input_key['l'] = *read("(right)");
 
   _read.on_read([&](auto const& ctx) {
     switch (_state) {

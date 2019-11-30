@@ -846,7 +846,6 @@ private:
   std::string version_;
   std::vector<std::string> usage_;
   std::string description_;
-  int options_indent_ {0};
   std::vector<Output> info_;
   std::string author_;
   std::map<std::string, Option> data_;

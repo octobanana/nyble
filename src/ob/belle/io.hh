@@ -110,6 +110,25 @@ public:
       Page_up,
       Page_down
     };
+    inline static const std::unordered_map<std::string, char32_t> map {
+      {"bell", Bell},
+      {"tab", Tab},
+      {"newline", Newline},
+      {"enter", Enter},
+      {"escape", Escape},
+      {"space", Space},
+      {"backspace", Backspace},
+      {"up", Up},
+      {"down", Down},
+      {"left", Left},
+      {"right", Right},
+      {"home", Home},
+      {"end", End},
+      {"delete", Delete},
+      {"insert", Insert},
+      {"pageup", Page_up},
+      {"pagedown", Page_down},
+    };
     std::string str;
     char32_t ch {0};
   };

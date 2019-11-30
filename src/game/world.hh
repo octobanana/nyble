@@ -269,11 +269,7 @@ private:
   void do_timer();
   void on_timer(Belle::error_code const& ec);
 
-  using Fn = std::function<void()>;
-  std::unordered_map<std::string, Fn> _fn;
-  std::unordered_map<char32_t, Fn> _input_play;
-  void fn_init();
-  void input_play_init();
+  std::unordered_map<char32_t, Xpr> _input_key;
   void input_play(Belle::IO::Read::Ctx const& ctx);
   void input_prompt(Belle::IO::Read::Ctx const& ctx);
   void input();
