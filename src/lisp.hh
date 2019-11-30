@@ -121,7 +121,7 @@ using Fn = std::function<Xpr(std::shared_ptr<Env>)>;
   Lst args {};
   Fn fn {nullptr};
   std::shared_ptr<Env> env {nullptr};
-  std::shared_ptr<Env> bind(Lst& l, std::shared_ptr<Env> e);
+  std::shared_ptr<Env> bind(Sym const& sym, Lst& l, std::shared_ptr<Env> e);
 };
 struct Xpr : std::variant<Lst, Fun, Atm> {};
 struct Val {

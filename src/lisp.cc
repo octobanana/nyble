@@ -135,17 +135,17 @@ template<typename T, typename F1, typename F2> void for_each(T& t, F1 const& f1,
   f2(t.back());
 }
 
-std::shared_ptr<Env> Fun::bind(Lst& l, std::shared_ptr<Env> e) {
-  if (args.empty() && l.size()) {throw std::runtime_error("expected '0' arguments");}
+std::shared_ptr<Env> Fun::bind(Sym const& sym, Lst& l, std::shared_ptr<Env> e) {
+  if (args.empty() && l.size()) {throw std::runtime_error("'" + sym + "' expected '0' arguments");}
   auto const has_rest {[this]() {
-    if (auto const l = xpr_lst(&args.back()); l && l->empty()) {
+    if (auto const s = xpr_sym(&args.back()); s && *s == "@") {
       return true;
     }
     return false;
   }()};
   if (has_rest) {
     if (l.size() < args.size() - 1) {
-      throw std::runtime_error("expected at least '" + std::to_string(args.size() - 1) + "' " + plural("argument", "s", args.size() - 1));
+      throw std::runtime_error("'" + sym + "' expected at least '" + std::to_string(args.size() - 1) + "' " + plural("argument", "s", args.size() - 1));
     }
     auto ev = std::make_shared<Env>(env, e);
     auto v = l.begin();
@@ -154,16 +154,17 @@ std::shared_ptr<Env> Fun::bind(Lst& l, std::shared_ptr<Env> e) {
         (*ev)[*sym] = {*v, e};
         continue;
       }
-      throw std::runtime_error("fn binding expected symbol");
+      throw std::runtime_error("'" + sym + "' fn binding expected 'Sym'");
     }
     Xpr rest;
     auto& r = std::get<Lst>(rest);
     r.splice(r.begin(), l, v, l.end());
+    // TODO should rest args be evaled?
     (*ev)["@"] = {rest, e, Val::evaled};
     return ev;
   }
   if (l.size() != args.size()) {
-    throw std::runtime_error("expected '" + std::to_string(args.size()) + "' " + plural("argument", "s", args.size()));
+    throw std::runtime_error("'" + sym + "' expected '" + std::to_string(args.size()) + "' " + plural("argument", "s", args.size()));
   }
   auto ev = std::make_shared<Env>(env, e);
   auto s = args.begin();
@@ -173,7 +174,7 @@ std::shared_ptr<Env> Fun::bind(Lst& l, std::shared_ptr<Env> e) {
       ++s;
       continue;
     }
-    throw std::runtime_error("fn binding expected symbol");
+    throw std::runtime_error("'" + sym + "' fn binding expected 'Sym'");
   }
   return ev;
 }
@@ -439,8 +440,8 @@ Xpr eval_impl(Xpr& xr, std::shared_ptr<Env> ev) {
       if (auto p = ev->find(*s)) {
         auto& v = (*p)->second;
         if (!(v.ctx & Val::evaled)) {
-          v.ctx |= Val::evaled;
           v.xpr = eval(v.xpr, v.env);
+          v.ctx |= Val::evaled;
         }
         return v.xpr;
       }
@@ -448,6 +449,8 @@ Xpr eval_impl(Xpr& xr, std::shared_ptr<Env> ev) {
     }
     if (auto const n = atm_num(a)) {
       if (auto const p = num_int(n)) {return num_xpr(*p);}
+      if (auto const p = num_rat(n)) {return num_xpr(*p);}
+      if (auto const p = num_flo(n)) {return num_xpr(*p);}
     }
     throw std::runtime_error("unknown atom");
   }
@@ -463,7 +466,7 @@ Xpr eval_impl(Xpr& xr, std::shared_ptr<Env> ev) {
       Xpr args {*l};
       auto& l = std::get<Lst>(args);
       l.pop_front();
-      Xpr res {f->fn(f->bind(l, ev))};
+      Xpr res {f->fn(f->bind({"#<Fn>"}, l, ev))};
       return res;
     }
     if (auto const i = xpr_int(&fn)) {
@@ -481,18 +484,64 @@ Xpr eval_impl(Xpr& xr, std::shared_ptr<Env> ev) {
     }
     if (auto const a = xpr_atm(&fn)) {
       if (auto const s = atm_sym(a)) {
+        if (*s == "@") {
+          if (l->size() > 2) {throw std::runtime_error("'@' expected '1' argument of type 'list'");}
+          auto x = eval(l->back(), ev);
+          if (auto const v = xpr_lst(&x)) {
+            if (v->size() < 2) {return Xpr{};}
+            return (v->pop_front(), x);
+          }
+          if (auto const v = xpr_str(&x)) {
+            if (v->size() < 2) {return Xpr{};}
+            return (*v = v->substr(1), x);
+          }
+          throw std::runtime_error("invalid type '" + typ_str.at(type(x)) + "'");
+        }
         Xpr v {sym_xpr(*s)};
         Xpr func {eval(v, ev)};
-        if (auto const f = xpr_fun(&func)) {
+        if (auto const i = xpr_int(&func)) {
+          if (l->size() != 2) {throw std::runtime_error("'int' expected '1' argument");}
+          Xpr v {eval(*std::next(l->begin(), 1), ev)};
+          if (auto const l = xpr_lst(&v)) {
+            if (*i >= l->size()) {throw std::runtime_error("'int' is out of range '" + std::to_string(static_cast<std::size_t>(*i)) + "' >= '" + std::to_string(l->size()) + "'");}
+            return *std::next(l->begin(), static_cast<Lst::difference_type>(*i));
+          }
+          if (auto const s = xpr_str(&v)) {
+            if (*i >= s->size()) {throw std::runtime_error("'int' is out of range '" + std::to_string(static_cast<std::size_t>(*i)) + "' >= '" + std::to_string(s->size()) + "'");}
+            return str_xpr(s->at(static_cast<std::size_t>(*i)));
+          }
+          throw std::runtime_error("'int' expected '1' argument of type 'list'");
+        }
+        else if (auto const f = xpr_fun(&func)) {
           Xpr args {*l};
           auto& l = std::get<Lst>(args);
           l.pop_front();
-          Xpr res {f->fn(f->bind(l, ev))};
+          Xpr res {f->fn(f->bind(*s, l, ev))};
           return res;
+
+          // TODO add function memoization
+
+          // auto xp = print(args);
+          // if (auto m = f->memo->find(xp); m != f->memo->end()) {
+          //   std::cerr << "cache> " << print(*l->begin()) << " | " << xp << " -> " << print(m->second) << "\n";
+          //   return m->second;
+          // }
+          // auto xp = print(xr);
+          // if (auto m = ev->memo->find(xp); m != ev->memo->end()) {
+          //   // std::cerr << "cache> " << print(*l->begin()) << " | " << xp << " -> " << print(m->second) << "\n";
+          //   return m->second;
+          // }
+          // Xpr res {f->fn(args, ev)};
+          // (*f->memo)[xp] = res;
+          // std::cerr << "memo> " << print(*l->begin()) << " | " << xp << " -> " << print(res) << "\n";
+          // (*ev->memo)[xp] = res;
+          // ev->dump_inner();
+          // std::cerr << "memo> " << print(*l->begin()) << " | " << xp << " -> " << print(res) << "\n";
+          // return res;
         }
       }
     }
-    throw std::runtime_error("unknown function '" + print(fn) + "'");
+    throw std::runtime_error("unknown 'Fn' '" + print(fn) + "'");
   }
   throw std::runtime_error("invalid eval");
 }

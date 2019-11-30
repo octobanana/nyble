@@ -70,7 +70,7 @@ inline void program_init(OB::Parg& pg)
   pg.usage("[--colour=<on|off|auto>] --license");
 
   pg.info({"Key Bindings", {
-    {"q, Q, <ctrl-c>", "quit the program"},
+    {"q, <ctrl-c>", "quit the program"},
     {":", "enter the command prompt"},
     {"<space>", "start/pause the game"},
     {"?", "show the help output"},

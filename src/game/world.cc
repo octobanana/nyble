@@ -456,14 +456,16 @@ void World::signals() {
 }
 
 void World::lang() {
-  // TODO add variable get/set functions to help debug and test
   env_init(_env, 0, nullptr);
+
   (*_env)["snake-len?"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     return num_xpr(static_cast<Int>(_snake.pos.size()));
   }}, _env, Val::evaled};
+
   (*_env)["snake-ext?"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     return num_xpr(static_cast<Int>(_snake.ext));
   }}, _env, Val::evaled};
+
   (*_env)["snake-ext"] = Val{Fun{str_lst("(a)"), [&](auto e) -> Xpr {
     auto x = eval(sym_xpr("a"), e);
     if (auto const v = xpr_int(&x)) {
@@ -472,6 +474,7 @@ void World::lang() {
     }
     throw std::runtime_error("expected number");
   }}, _env, Val::evaled};
+
   (*_env)["tick"] = Val{Fun{str_lst("(a)"), [&](auto e) -> Xpr {
     auto x = eval(sym_xpr("a"), e);
     if (auto const v = xpr_int(&x)) {
@@ -480,173 +483,221 @@ void World::lang() {
     }
     throw std::runtime_error("expected number");
   }}, _env, Val::evaled};
+
   (*_env)["egg-pos"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     return Xpr{Lst{num_xpr(static_cast<Int>(_egg.pos.x)), num_xpr(static_cast<Int>(_egg.pos.y))}};
   }}, _env, Val::evaled};
+
+  (*_env)["key"] = Val{Fun{str_lst("(a @)"), [&](auto e) -> Xpr {
+    auto a = eval(sym_xpr("a"), e);
+    if (auto const s = xpr_str(&a)) {
+      if (s->size() != 1) {
+        throw std::runtime_error("expected exactly one 'Str' character");
+      }
+      auto key = OB::Term::utf8_to_char32(s->front());
+      auto x = eval(sym_xpr("@"), e);
+      auto& l = std::get<Lst>(x);
+      std::vector<Fn*> fns;
+      for (auto it = l.begin(); it != l.end(); ++it) {
+        auto x = eval(*it, e->current);
+        if (auto const f = xpr_str(&x)) {
+          if (auto const v = _fn.find(f->str()); v != _fn.end()) {
+            fns.emplace_back(&v->second);
+          }
+          else {
+            throw std::runtime_error("invalid function '" + f->str() + "'");
+          }
+        }
+        else {
+          throw std::runtime_error("invalid type '" + typ_str.at(type(a)) + "'");
+        }
+      }
+      _input_play[key] = [fns = std::move(fns)] {
+        for (auto* fn : fns) {(*fn)();}
+      };
+      return a;
+    }
+    throw std::runtime_error("invalid type '" + typ_str.at(type(a)) + "'");
+  }}, _env, Val::evaled};
+
+  (*_env)["coil"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
+    _fn["coil"]();
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
+}
+
+void World::fn_init() {
+  _fn["quit"] = [&] {
+    _io.stop();
+  };
+
+  _fn["sigint"] = [&] {
+    std::cout << aec::erase_down << std::flush;
+    kill(getpid(), SIGINT);
+  };
+
+  _fn["refresh"] = [&] {
+    game_redraw();
+  };
+
+  _fn["prompt"] = [&] {
+    // pause
+    _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
+    _timer.cancel();
+    // init prompt
+    _state_stk.push(_state);
+    _state = State::prompt;
+    buf_clear();
+    _buf << win_cursor({0, 0});
+    _buf << _readline.clear().refresh().render();
+    buf_print();
+  };
+
+  _fn["restart"] = [&] {
+    _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
+    _timer.cancel();
+    game_init();
+  };
+
+  _fn["coil"] = [&] {
+    _snake.ext += _snake.pos.size() - 1;
+    buf_clear();
+    while (_snake.pos.size() > 1) {
+      draw_grid(_snake.pos.back(), 1, 1);
+      _snake.pos.pop_back();
+    }
+    buf_print();
+  };
+
+  _fn["help"] = [&] {
+    _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
+    _timer.cancel();
+    std::cout << aec::mouse_disable << aec::nl << aec::screen_pop << aec::cursor_show << std::flush;
+    _term_mode.set_cooked();
+    std::system(("$(which less) -ir <<'EOF'\n" + _pg.help() + "EOF").c_str());
+    _term_mode.set_raw();
+    std::cout << aec::cursor_hide << aec::screen_push << aec::cursor_hide << aec::mouse_enable << aec::screen_clear << aec::cursor_home << std::flush;
+    game_redraw();
+  };
+
+  _fn["pause"] = [&] {
+    if (_timer.expiry() == (std::chrono::high_resolution_clock::time_point::min)()) {
+      buf_clear();
+      _buf << win_cursor({0, 0});
+      _buf << aec::erase_line;
+      buf_print();
+      do_timer();
+    }
+    else {
+      _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
+      _timer.cancel();
+    }
+  };
+
+  _fn["left2"] = [&] {
+    Snake::Dir dir;
+    if (_snake.dir.size()) {dir = _snake.dir.back();}
+    else {dir = _snake.dir_prev;}
+    switch (dir) {
+      case Snake::up: {
+        _snake.dir.emplace_back(Snake::left);
+        break;
+      }
+      case Snake::down: {
+        _snake.dir.emplace_back(Snake::right);
+        break;
+      }
+      case Snake::left: {
+        _snake.dir.emplace_back(Snake::down);
+        break;
+      }
+      case Snake::right: {
+        _snake.dir.emplace_back(Snake::up);
+        break;
+      }
+    }
+  };
+
+  _fn["right2"] = [&] {
+    Snake::Dir dir;
+    if (_snake.dir.size()) {dir = _snake.dir.back();}
+    else {dir = _snake.dir_prev;}
+    switch (dir) {
+      case Snake::up: {
+        _snake.dir.emplace_back(Snake::right);
+        break;
+      }
+      case Snake::down: {
+        _snake.dir.emplace_back(Snake::left);
+        break;
+      }
+      case Snake::left: {
+        _snake.dir.emplace_back(Snake::up);
+        break;
+      }
+      case Snake::right: {
+        _snake.dir.emplace_back(Snake::down);
+        break;
+      }
+    }
+  };
+
+  _fn["up"] = [&] {
+    if ((_snake.dir.empty() && _snake.dir_prev != Snake::up) || (_snake.dir.size() && _snake.dir.back() != Snake::up)) {
+      _snake.dir.emplace_back(Snake::up);
+    }
+  };
+
+  _fn["down"] = [&] {
+    if ((_snake.dir.empty() && _snake.dir_prev != Snake::down) || (_snake.dir.size() && _snake.dir.back() != Snake::down)) {
+      _snake.dir.emplace_back(Snake::down);
+    }
+  };
+
+  _fn["left"] = [&] {
+    if ((_snake.dir.empty() && _snake.dir_prev != Snake::left) || (_snake.dir.size() && _snake.dir.back() != Snake::left)) {
+      _snake.dir.emplace_back(Snake::left);
+    }
+  };
+
+  _fn["right"] = [&] {
+    if ((_snake.dir.empty() && _snake.dir_prev != Snake::right) || (_snake.dir.size() && _snake.dir.back() != Snake::right)) {
+      _snake.dir.emplace_back(Snake::right);
+    }
+  };
+}
+
+void World::input_play_init() {
+  _input_play['q'] = _fn["quit"];
+  _input_play[Term::ctrl_key('c')] = _fn["sigint"];
+  _input_play[Term::ctrl_key('l')] = _fn["refresh"];
+  _input_play[':'] = _fn["prompt"];
+  _input_play['r'] = _fn["restart"];
+  _input_play['z'] = _fn["coil"];
+  _input_play['?'] = _fn["help"];
+  _input_play[Key::Space] = _fn["pause"];
+  _input_play[','] = _fn["left2"];
+  _input_play['.'] = _fn["right2"];
+  _input_play[Key::Up] = _fn["up"];
+  _input_play['w'] = _fn["up"];
+  _input_play['k'] = _fn["up"];
+  _input_play[Key::Down] = _fn["down"];
+  _input_play['s'] = _fn["down"];
+  _input_play['j'] = _fn["down"];
+  _input_play[Key::Left] = _fn["left"];
+  _input_play['a'] = _fn["left"];
+  _input_play['h'] = _fn["left"];
+  _input_play[Key::Right] = _fn["right"];
+  _input_play['d'] = _fn["right"];
+  _input_play['l'] = _fn["right"];
 }
 
 void World::input_play(Belle::IO::Read::Ctx const& ctx) {
   auto const pkey = std::get_if<Key>(&ctx);
   if (!pkey) {return;}
-  // OB::Text::Char32 key {pkey->ch, pkey->str};
-  switch (pkey->ch) {
-    case Term::ctrl_key('c'): {
-      std::cout
-      << aec::erase_down
-      << std::flush;
-      kill(getpid(), SIGINT);
-      break;
-    }
-    case Term::ctrl_key('l'): {
-      game_redraw();
-      break;
-    }
-    case ':': {
-      // pause
-      _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
-      _timer.cancel();
-      // init prompt
-      _state_stk.push(_state);
-      _state = State::prompt;
-      buf_clear();
-      _buf << win_cursor({0, 0});
-      _buf << _readline.clear().refresh().render();
-      buf_print();
-      break;
-    }
-    case 'q': case 'Q': {
-      _io.stop();
-      break;
-    }
-    case 'r': {
-      _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
-      _timer.cancel();
-      game_init();
-      break;
-    }
-    case 'z': {
-      _snake.ext += _snake.pos.size() - 1;
-      buf_clear();
-      while (_snake.pos.size() > 1) {
-        draw_grid(_snake.pos.back(), 1, 1);
-        _snake.pos.pop_back();
-      }
-      buf_print();
-      break;
-    }
-    case '?': {
-      _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
-      _timer.cancel();
 
-      std::cout
-      << aec::mouse_disable
-      << aec::nl
-      << aec::screen_pop
-      << aec::cursor_show
-      << std::flush;
-      _term_mode.set_cooked();
-
-      std::system(("$(which less) -ir <<'EOF'\n" + _pg.help() + "EOF").c_str());
-
-      _term_mode.set_raw();
-      std::cout
-      << aec::cursor_hide
-      << aec::screen_push
-      << aec::cursor_hide
-      << aec::mouse_enable
-      << aec::screen_clear
-      << aec::cursor_home
-      << std::flush;
-
-      game_redraw();
-      break;
-    }
-    case Key::Space: case 'p': {
-      if (_timer.expiry() == (std::chrono::high_resolution_clock::time_point::min)()) {
-        buf_clear();
-        _buf << win_cursor({0, 0});
-        _buf << aec::erase_line;
-        buf_print();
-        do_timer();
-      }
-      else {
-        _timer.expires_at((std::chrono::high_resolution_clock::time_point::min)());
-        _timer.cancel();
-      }
-      break;
-    }
-    case ',': {
-      Snake::Dir dir;
-      if (_snake.dir.size()) {dir = _snake.dir.back();}
-      else {dir = _snake.dir_prev;}
-      switch (dir) {
-        case Snake::up: {
-          _snake.dir.emplace_back(Snake::left);
-          break;
-        }
-        case Snake::down: {
-          _snake.dir.emplace_back(Snake::right);
-          break;
-        }
-        case Snake::left: {
-          _snake.dir.emplace_back(Snake::down);
-          break;
-        }
-        case Snake::right: {
-          _snake.dir.emplace_back(Snake::up);
-          break;
-        }
-      }
-      break;
-    }
-    case '.': {
-      Snake::Dir dir;
-      if (_snake.dir.size()) {dir = _snake.dir.back();}
-      else {dir = _snake.dir_prev;}
-      switch (dir) {
-        case Snake::up: {
-          _snake.dir.emplace_back(Snake::right);
-          break;
-        }
-        case Snake::down: {
-          _snake.dir.emplace_back(Snake::left);
-          break;
-        }
-        case Snake::left: {
-          _snake.dir.emplace_back(Snake::up);
-          break;
-        }
-        case Snake::right: {
-          _snake.dir.emplace_back(Snake::down);
-          break;
-        }
-      }
-      break;
-    }
-    case Key::Up: case 'w': case 'k': {
-      if ((_snake.dir.empty() && _snake.dir_prev != Snake::up) || (_snake.dir.size() && _snake.dir.back() != Snake::up)) {
-        _snake.dir.emplace_back(Snake::up);
-      }
-      break;
-    }
-    case Key::Down: case 's': case 'j': {
-      if ((_snake.dir.empty() && _snake.dir_prev != Snake::down) || (_snake.dir.size() && _snake.dir.back() != Snake::down)) {
-        _snake.dir.emplace_back(Snake::down);
-      }
-      break;
-    }
-    case Key::Left: case 'a': case 'h': {
-      if ((_snake.dir.empty() && _snake.dir_prev != Snake::left) || (_snake.dir.size() && _snake.dir.back() != Snake::left)) {
-        _snake.dir.emplace_back(Snake::left);
-      }
-      break;
-    }
-    case Key::Right: case 'd': case 'l': {
-      if ((_snake.dir.empty() && _snake.dir_prev != Snake::right) || (_snake.dir.size() && _snake.dir.back() != Snake::right)) {
-        _snake.dir.emplace_back(Snake::right);
-      }
-      break;
-    }
+  if (auto const v = _input_play.find(pkey->ch); v != _input_play.end()) {
+    v->second();
   }
 }
 
@@ -655,8 +706,7 @@ void World::input_prompt(Belle::IO::Read::Ctx const& ctx) {
   if (!pkey) {return;}
   OB::Text::Char32 key {pkey->ch, pkey->str};
   buf_clear();
-  _buf << win_cursor({0, 0});
-  _buf << aec::erase_line;
+  _buf << win_cursor({0, 0}) << aec::erase_line;
   if (! _readline(key)) {
     _buf << _readline.render();
     buf_print();
@@ -668,11 +718,15 @@ void World::input_prompt(Belle::IO::Read::Ctx const& ctx) {
       try {
         if (auto x = read(input)) {
           auto v = eval(*x, _env);
-          _buf << aec::fg_green_bright << ">" << aec::clear << cprint(v);
+          auto const res = cprint(v);
+          Text::View vres {res};
+          _buf << win_cursor({0, 0}) << aec::erase_line << aec::fg_green_bright << ">" << aec::clear << vres.colstr(0, _win_width - 1);
         }
       }
       catch (std::exception const& e) {
-        _buf << aec::fg_red << ">" << aec::clear << cprint(*read("(err \""s + e.what() + "\")"s));
+        auto const res = cprint(*read("(err \""s + e.what() + "\")"s));
+        Text::View vres {res};
+        _buf << win_cursor({0, 0}) << aec::erase_line << aec::fg_red << ">" << aec::clear << vres.colstr(0, _win_width - 1);
       }
       // deinit prompt
       _buf << aec::cursor_hide;
@@ -691,7 +745,7 @@ void World::input_prompt(Belle::IO::Read::Ctx const& ctx) {
 
 void World::input() {
   // debug
-  // _readline.hist_load("./history.txt");
+  _readline.hist_load("./history.txt");
   _readline.style("");
   _readline.prompt(">", aec::fg_magenta_bright);
   _readline.refresh();
@@ -703,6 +757,9 @@ void World::input() {
     }
     return values;
   });
+
+  fn_init();
+  input_play_init();
 
   _read.on_read([&](auto const& ctx) {
     switch (_state) {
@@ -728,6 +785,7 @@ void World::input() {
       }
     }
   });
+
   _read.run();
 }
 

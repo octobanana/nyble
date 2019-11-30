@@ -3,6 +3,7 @@
 
 #include "lisp.hh"
 #include "ob/parg.hh"
+#include "ob/text.hh"
 #include "ob/term.hh"
 #include "ob/readline.hh"
 #include "ob/belle/io.hh"
@@ -24,15 +25,63 @@
 #include <algorithm>
 #include <filesystem>
 #include <functional>
+#include <unordered_map>
 
 using Readline = OB::Readline;
 using namespace std::chrono_literals;
 using namespace std::string_literals;
 namespace fs = std::filesystem;
-namespace Belle = OB::Belle;
+namespace Text = OB::Text;
 namespace Term = OB::Term;
+namespace Belle = OB::Belle;
 namespace iom = OB::Term::iomanip;
 namespace aec = OB::Term::ANSI_Escape_Codes;
+
+// Root <- events
+// scenes
+//   menu
+//     objects
+//       UI
+//   game
+//     state
+//       start
+//       pause
+//       over
+//       play
+//     objects
+//       UI
+//       Board
+//       Snake
+//       Egg
+
+class Scene {
+public:
+  Scene() = default;
+  Scene(Scene&&) = default;
+  Scene(Scene const&) = default;
+  virtual ~Scene() = 0;
+  Scene& operator=(Scene&&) = default;
+  Scene& operator=(Scene const&) = default;
+  virtual void render() = 0;
+  virtual void update() = 0;
+  virtual void input() = 0;
+private:
+};
+
+class Root : Scene {
+public:
+  Root() = default;
+  Root(Root&&) = default;
+  Root(Root const&) = default;
+  ~Root();
+  Root& operator=(Root&&) = default;
+  Root& operator=(Root const&) = default;
+  void render();
+  void update();
+  void input();
+private:
+  // std::vector<Scene> _scenes{};
+};
 
 class World final {
 public:
@@ -51,34 +100,6 @@ private:
   Belle::Signal _sig {_io};
   Belle::IO::Read _read {_io};
   Term::Mode _term_mode;
-
-  class Scene {
-  public:
-    Scene() = default;
-    Scene(Scene&&) = default;
-    Scene(Scene const&) = default;
-    virtual ~Scene() = 0;
-    Scene& operator=(Scene&&) = default;
-    Scene& operator=(Scene const&) = default;
-    virtual void render() = 0;
-    virtual void update() = 0;
-    virtual void input() = 0;
-  private:
-  };
-
-  class Manager : Scene {
-  public:
-    Manager() = default;
-    Manager(Manager&&) = default;
-    Manager(Manager const&) = default;
-    ~Manager() = 0;
-    Manager& operator=(Manager&&) = default;
-    Manager& operator=(Manager const&) = default;
-    void render();
-    void update();
-    void input();
-  private:
-  };
 
   template<typename T>
   class Tick {
@@ -228,30 +249,34 @@ private:
 
   std::string grid_cursor(Point const& obj);
 
-  void game_redraw();
-  void game_menu();
-  void game_init();
-  void game_play();
-  void game_over();
-
   void draw_border(Point const& pos, Size const& size, std::function<void(Point const&)> const& fx, std::function<void(Point const&)> const& fy);
   void draw_rect(Point const& pos, Size const& size, std::function<void(Point const&)> const& fx, std::function<void(Point const&)> const& fy);
   void draw_grid(Point const& pos, std::size_t const w, std::size_t const h);
 
   void draw_score();
   void update_score();
-
   void spawn_egg();
 
-  void input_play(Belle::IO::Read::Ctx const& ctx);
-  void input_prompt(Belle::IO::Read::Ctx const& ctx);
+  void game_redraw();
+  void game_menu();
+  void game_init();
+  void game_play();
+  void game_over();
 
   void signals();
   void lang();
-  void input();
 
   void do_timer();
   void on_timer(Belle::error_code const& ec);
+
+  using Fn = std::function<void()>;
+  std::unordered_map<std::string, Fn> _fn;
+  std::unordered_map<char32_t, Fn> _input_play;
+  void fn_init();
+  void input_play_init();
+  void input_play(Belle::IO::Read::Ctx const& ctx);
+  void input_prompt(Belle::IO::Read::Ctx const& ctx);
+  void input();
 };
 
 #endif
