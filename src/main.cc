@@ -72,8 +72,8 @@ int main(int argc, char** argv) {
 
   try
   {
-    World world {pg};
-    world.run();
+    Nyble::Game game {pg};
+    game.run();
   }
   catch(std::exception const& e)
   {
