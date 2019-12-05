@@ -70,7 +70,7 @@ std::string Readline::render() const
     case Mode::autocomplete:
     {
       ss
-      << aec::cursor_hide
+      // << aec::cursor_hide
       << aec::cr
       << _autocomplete
       << aec::clear;
@@ -81,7 +81,7 @@ std::string Readline::render() const
     default:
     {
       ss
-      << aec::cursor_hide
+      // << aec::cursor_hide
       << aec::cr
       << _style.input
       << OB::String::repeat(_width, " ")
@@ -92,8 +92,37 @@ std::string Readline::render() const
       << aec::clear
       << _prompt.rhs
       << aec::cr
-      << aec::cursor_right(_input.cur + 1)
-      << aec::cursor_show;
+      << aec::cursor_right(_input.cur + 1);
+      if (_input.cur + 2 == _width) {
+        if (_prompt.rhs.size()) {
+          ss
+          << aec::reverse
+          << _prompt.rhs;
+        }
+        else {
+          ss
+          << _style.input
+          << aec::reverse
+          << " ";
+        }
+      }
+      else {
+        ss
+        << _style.input
+        << aec::reverse;
+        auto const c = _input.fmt.colstr(_input.fmt.byte_to_char(_input.cur), 1);
+        if (c.size())
+        {
+          ss << c;
+        }
+        else
+        {
+          ss << " ";
+        }
+      }
+      ss << aec::clear;
+      // << aec::cursor_right(_input.cur + 1)
+      // << aec::cursor_show;
 
       break;
     }

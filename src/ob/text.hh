@@ -537,13 +537,17 @@ public:
     {
       size = _view.size();
     }
-    else
-    {
-      size += pos;
-    }
+    // else
+    // {
+    //   size += pos;
+    // }
 
     size_type count {0};
 
+    // for (size_type i = pos; i < size && i < _view.size(); ++i)
+    // {
+    //   count += _view.at(i).str.size();
+    // }
     for (size_type i = pos, cols = 0; i < _view.size(); ++i)
     {
       auto const& ctx = _view.at(i);

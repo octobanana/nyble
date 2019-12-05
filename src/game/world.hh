@@ -6,6 +6,7 @@
 #include "ob/text.hh"
 #include "ob/term.hh"
 #include "ob/readline.hh"
+#include "ob/ordered_map.hh"
 #include "ob/belle/io.hh"
 #include "ob/belle/signal.hh"
 
@@ -44,8 +45,19 @@
 //       Snake
 //       Egg
 
+// on_winch
+// on_input
+// on_update
+// on_render
+//   full
+//   update
+//   patch
+
 namespace Nyble {
 
+using Read = OB::Belle::IO::Read;
+using Key = OB::Belle::IO::Read::Key;
+using Mouse = OB::Belle::IO::Read::Mouse;
 using Tick = std::chrono::milliseconds;
 using Clock = std::chrono::high_resolution_clock;
 using Readline = OB::Readline;
@@ -61,6 +73,7 @@ namespace iom = OB::Term::iomanip;
 namespace aec = OB::Term::ANSI_Escape_Codes;
 
 struct Pos {
+  // TODO use signed integer
   std::size_t x {0};
   std::size_t y {0};
   Pos(std::size_t const x, std::size_t const y) : x {x}, y {y} {}
@@ -84,73 +97,79 @@ struct Size {
   Size& operator=(Size const&) = default;
 };
 
-struct Cell {
-  std::string const* style {nullptr};
-  std::string value;
-  Cell(std::string const* style, std::string const& value) : style {style}, value {value} {};
-  Cell() = default;
-  Cell(Cell&&) = default;
-  Cell(Cell const&) = default;
-  ~Cell() = default;
-  Cell& operator=(Cell&&) = default;
-  Cell& operator=(Cell const&) = default;
-};
+class Game;
 
-struct Ctx {
-  Size size;
-  Ctx() = default;
-  Ctx(Ctx&&) = default;
-  Ctx(Ctx const&) = default;
-  ~Ctx() = default;
-  Ctx& operator=(Ctx&&) = default;
-  Ctx& operator=(Ctx const&) = default;
-};
+using Ctx = Game&;
 
 class Scene {
 public:
-  Scene(Ctx const* ctx) : _ctx {ctx} {}
+  Scene(Ctx ctx) : _ctx {ctx} {}
   Scene(Scene&&) = default;
   Scene(Scene const&) = default;
   virtual ~Scene() = default;
   Scene& operator=(Scene&&) = default;
   Scene& operator=(Scene const&) = default;
-  virtual bool render(std::ostream& buf) = 0;
-  virtual void update() = 0;
-  virtual void input() = 0;
-  virtual void winch() = 0;
+  virtual void on_winch() = 0;
+  virtual void on_input(Read::Ctx const& ctx) = 0;
+  virtual bool on_update(int const delta) = 0;
+  virtual bool on_render(std::ostream& buf) = 0;
 
-protected:
-  Ctx const* _ctx;
+  Ctx _ctx;
   Pos _pos;
   Size _size;
+  std::vector<Pos> _patch;
 }; // class Scene
+
+using Scenes = OB::Ordered_map<std::string, std::shared_ptr<Scene>>;
+
+class Background : public Scene {
+public:
+  Background(Ctx ctx);
+  Background(Background&&) = default;
+  Background(Background const&) = default;
+  ~Background();
+  Background& operator=(Background&&) = default;
+  Background& operator=(Background const&) = default;
+  void on_winch();
+  void on_input(Read::Ctx const& ctx);
+  bool on_update(int const delta);
+  bool on_render(std::ostream& buf);
+
+// private:
+  struct Cell {
+    std::string const* style;
+    std::string value;
+  };
+  struct {
+    std::string primary {aec::bg_true("#23262c")};
+  } _color;
+  std::vector<std::vector<Cell>> _sprite;
+  bool _dirty {true};
+  bool _draw {true};
+
+  void draw();
+}; // class Background
 
 class Border : public Scene {
 public:
-  Border(Ctx const* ctx);
+  Border(Ctx ctx);
   Border(Border&&) = default;
   Border(Border const&) = default;
   ~Border();
   Border& operator=(Border&&) = default;
   Border& operator=(Border const&) = default;
-  bool render(std::ostream& buf);
-  void update();
-  void input();
-  void winch();
+  void on_winch();
+  void on_input(Read::Ctx const& ctx);
+  bool on_update(int const delta);
+  bool on_render(std::ostream& buf);
 
-private:
-  // struct {
-  //   std::string _line_top {"─"};
-  //   std::string _line_bottom {"─"};
-  //   std::string _line_left {"│"};
-  //   std::string _line_right {"│"};
-  //   std::string _corner_top_left {"┌"};
-  //   std::string _corner_top_right {"┐"};
-  //   std::string _corner_bottom_left {"└"};
-  //   std::string _corner_bottom_right {"┘"};
-  // } _ch;
+// private:
+  struct Cell {
+    std::string const* style {nullptr};
+    std::string value;
+  };
   struct {
-    std::string primary {aec::fg_true("#93a1a1")};
+    std::string primary {aec::fg_true("#93a1a1") + aec::bg_true("#23262c")};
   } _color;
   std::vector<std::vector<Cell>> _sprite;
   bool _draw {true};
@@ -161,18 +180,22 @@ private:
 
 class Board : public Scene {
 public:
-  Board(Ctx const* ctx);
+  Board(Ctx ctx);
   Board(Board&&) = default;
   Board(Board const&) = default;
   ~Board();
   Board& operator=(Board&&) = default;
   Board& operator=(Board const&) = default;
-  bool render(std::ostream& buf);
-  void update();
-  void input();
-  void winch();
+  void on_winch();
+  void on_input(Read::Ctx const& ctx);
+  bool on_update(int const delta);
+  bool on_render(std::ostream& buf);
 
-private:
+// private:
+  struct Cell {
+    std::string const* style {nullptr};
+    std::string value;
+  };
   struct {
     std::string primary {aec::bg_true("#1b1e24")};
     std::string secondary {aec::bg_true("#2c323c")};
@@ -184,15 +207,115 @@ private:
   void draw();
 }; // class Board
 
+class Snake : public Scene {
+public:
+  Snake(Ctx ctx);
+  Snake(Snake&&) = default;
+  Snake(Snake const&) = default;
+  ~Snake();
+  Snake& operator=(Snake&&) = default;
+  Snake& operator=(Snake const&) = default;
+  void on_winch();
+  void on_input(Read::Ctx const& ctx);
+  bool on_update(int const delta);
+  bool on_render(std::ostream& buf);
+
+// private:
+  struct Cell {
+    std::string const* style {nullptr};
+    std::string value;
+    Pos pos;
+  };
+  struct {
+    std::size_t idx {0};
+    std::string head {aec::bg_cyan};
+    std::vector<std::string> body {aec::bg_blue, aec::bg_blue_bright};
+  } _color;
+  enum Dir {Up, Down, Left, Right};
+  Dir _dir_prev {Up};
+  enum State {Stopped, Moving};
+  State _state {Stopped};
+  std::deque<Dir> _dir;
+  std::size_t _ext {8};
+  bool _update {false};
+  bool _dirty {true};
+  bool _draw {true};
+  int _delta {0};
+  int _interval {300};
+  std::deque<Cell> _sprite;
+  std::unordered_map<char32_t, Xpr> _input;
+
+  void draw();
+  void state_stopped();
+  void state_moving();
+}; // class Snake
+
+class Prompt : public Scene {
+public:
+  Prompt(Ctx ctx);
+  Prompt(Prompt&&) = default;
+  Prompt(Prompt const&) = default;
+  ~Prompt();
+  Prompt& operator=(Prompt&&) = default;
+  Prompt& operator=(Prompt const&) = default;
+  void on_winch();
+  void on_input(Read::Ctx const& ctx);
+  bool on_update(int const delta);
+  bool on_render(std::ostream& buf);
+
+// private:
+  Readline _readline;
+  enum State {Clear, Typing, Display};
+  State _state {Clear};
+  bool _dirty {false};
+  struct {
+    std::string prompt {aec::fg_true("#ff5500") + aec::bg_true("#23262c")};
+    std::string text {aec::fg_true("#f0f0f0") + aec::bg_true("#23262c")};
+    std::string success {aec::fg_true("#55ff00") + aec::bg_true("#23262c")};
+    std::string error {aec::fg_true("#ff0000") + aec::bg_true("#23262c")};
+  } _color;
+  std::string _buf;
+  bool _status {false};
+  int _delta {0};
+  int _interval {8000};
+
+  void draw();
+}; // class Prompt
+
+class Status : public Scene {
+public:
+  Status(Ctx ctx);
+  Status(Status&&) = default;
+  Status(Status const&) = default;
+  ~Status();
+  Status& operator=(Status&&) = default;
+  Status& operator=(Status const&) = default;
+  void on_winch();
+  void on_input(Read::Ctx const& ctx);
+  bool on_update(int const delta);
+  bool on_render(std::ostream& buf);
+
+// private:
+  struct {
+    std::string text {aec::fg_true("#ff5500") + aec::bg_true("#23262c")};
+  } _color;
+}; // class Status
+
 class Game final {
 public:
-  Game(OB::Parg& pg) : _pg {pg} {}
+  Game(OB::Parg& pg);
   Game(Game&&) = delete;
   Game(Game const&) = delete;
   ~Game() = default;
   Game& operator=(Game&&) = delete;
   Game& operator=(Game const&) = delete;
   void run();
+
+  Size _size;
+  Scenes _scenes;
+  std::shared_ptr<Env> _env {std::make_shared<Env>()};
+  std::string _focus;
+  int _fps_actual {0};
 
 private:
   void start();
@@ -201,32 +324,28 @@ private:
   void screen_init();
   void screen_deinit();
   void lang_init();
-  void readline_init();
   void await_signal();
   void await_read();
   void await_tick();
   void on_tick(error_code const& ec);
-  bool on_read(Belle::IO::Read::Null const& ctx);
-  bool on_read(Belle::IO::Read::Mouse const& ctx);
-  bool on_read(Belle::IO::Read::Key const& ctx);
+  bool on_read(Read::Null const& ctx);
+  bool on_read(Read::Mouse const& ctx);
+  bool on_read(Read::Key const& ctx);
   void buf_clear();
   void buf_flush();
 
   OB::Parg& _pg;
-  Readline _readline;
   Belle::asio::io_context _io {1};
   Belle::Signal _sig {_io};
-  Belle::IO::Read _read {_io};
+  Read _read {_io};
   Term::Mode _term_mode;
   std::chrono::time_point<Clock> _tick_begin {(Clock::time_point::min)()};
   std::chrono::time_point<Clock> _tick_end {(Clock::time_point::min)()};
-  Tick _tick {16ms};
+  int _fps {30};
+  Tick _tick {static_cast<Tick>(1000 / _fps)};
   Timer _timer {_io};
-  std::shared_ptr<Env> _env {std::make_shared<Env>()};
   std::unordered_map<char32_t, Xpr> _input;
   std::stringstream _buf;
-  Ctx _ctx;
-  std::vector<std::shared_ptr<Scene>> _scenes;
 }; // class Game
 
 }; // namespace Nyble
