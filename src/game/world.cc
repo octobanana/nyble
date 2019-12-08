@@ -117,6 +117,7 @@ bool Border::on_render(std::string& buf) {
   if (_dirty) {
     _dirty = false;
     _pos = Pos((_ctx._size.w / 4) - (_size.w / 2), (_ctx._size.h / 2) - (_size.h / 2));
+    if (_pos.y % 2) {++_pos.y;}
     std::size_t y {0};
     for (auto const& row : _sprite) {
       buf += aec::cursor_set((_pos.x * 2) + 1, _ctx._size.h - (_pos.y + y++));
@@ -134,7 +135,7 @@ bool Border::on_render(std::string& buf) {
 void Border::draw() {
   _draw = false;
   _sprite.clear();
-  _size = Size([&]{if (auto const w = _ctx._size.w - 4; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 4);
+  _size = Size([&]{if (auto const w = _ctx._size.w - 4; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 3);
   for (std::size_t y = 0; y < _size.h; ++y) {
     _sprite.emplace_back(std::vector<Cell>());
     auto& row = _sprite.back();
@@ -195,8 +196,9 @@ void Border::draw() {
 // Board -----------------------------------------------------------------------
 
 Board::Board(Ctx ctx) : Scene(ctx) {
-  _size = Size([&]{if (auto const w = _ctx._size.w - 8; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 6);
+  _size = Size([&]{if (auto const w = _ctx._size.w - 8; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 5);
   _pos = Pos((_ctx._size.w / 4) - (_size.w / 2), (_ctx._size.h / 2) - (_size.h / 2));
+  if (_pos.y % 2 == 0) {++_pos.y;}
 }
 
 Board::~Board() {
@@ -222,6 +224,7 @@ bool Board::on_render(std::string& buf) {
     _dirty = false;
     _patch.clear();
     _pos = Pos((_ctx._size.w / 4) - (_size.w / 2), (_ctx._size.h / 2) - (_size.h / 2));
+    if (_pos.y % 2 == 0) {++_pos.y;}
     std::size_t y {0};
     for (auto const& row : _sprite) {
       buf += aec::cursor_set((_pos.x * 2) + 1, _ctx._size.h - (_pos.y + y++));
@@ -251,7 +254,6 @@ bool Board::on_render(std::string& buf) {
 void Board::draw() {
   _draw = false;
   _sprite.clear();
-  // _size = Size([&]{if (auto const w = _ctx._size.w - 8; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 6);
   bool swap {false};
   for (std::size_t h = 0; h < _size.h; ++h) {
     _sprite.emplace_back(std::vector<Cell>());
@@ -641,7 +643,7 @@ Hud::~Hud() {
 void Hud::on_winch() {
   _dirty = true;
   _size = Size(_ctx._size.w, 1);
-  _pos = Pos(0, _ctx._size.h - 2);
+  _pos = Pos(0, _ctx._size.h - 1);
 }
 
 bool Hud::on_input(Read::Ctx const& ctx) {
