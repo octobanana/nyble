@@ -110,9 +110,9 @@ public:
   Scene& operator=(Scene&&) = default;
   Scene& operator=(Scene const&) = default;
   virtual void on_winch() = 0;
-  virtual void on_input(Read::Ctx const& ctx) = 0;
-  virtual bool on_update(int const delta) = 0;
-  virtual bool on_render(std::ostream& buf) = 0;
+  virtual bool on_input(Read::Ctx const& ctx) = 0;
+  virtual bool on_update(Tick const delta) = 0;
+  virtual bool on_render(std::string& buf) = 0;
 
   Ctx _ctx;
   Pos _pos;
@@ -131,9 +131,9 @@ public:
   Background& operator=(Background&&) = default;
   Background& operator=(Background const&) = default;
   void on_winch();
-  void on_input(Read::Ctx const& ctx);
-  bool on_update(int const delta);
-  bool on_render(std::ostream& buf);
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(std::string& buf);
 
 // private:
   struct Cell {
@@ -159,9 +159,9 @@ public:
   Border& operator=(Border&&) = default;
   Border& operator=(Border const&) = default;
   void on_winch();
-  void on_input(Read::Ctx const& ctx);
-  bool on_update(int const delta);
-  bool on_render(std::ostream& buf);
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(std::string& buf);
 
 // private:
   struct Cell {
@@ -187,9 +187,9 @@ public:
   Board& operator=(Board&&) = default;
   Board& operator=(Board const&) = default;
   void on_winch();
-  void on_input(Read::Ctx const& ctx);
-  bool on_update(int const delta);
-  bool on_render(std::ostream& buf);
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(std::string& buf);
 
 // private:
   struct Cell {
@@ -216,9 +216,9 @@ public:
   Snake& operator=(Snake&&) = default;
   Snake& operator=(Snake const&) = default;
   void on_winch();
-  void on_input(Read::Ctx const& ctx);
-  bool on_update(int const delta);
-  bool on_render(std::ostream& buf);
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(std::string& buf);
 
 // private:
   struct Cell {
@@ -236,19 +236,44 @@ public:
   enum State {Stopped, Moving};
   State _state {Stopped};
   std::deque<Dir> _dir;
-  std::size_t _ext {8};
+  std::size_t _ext {2};
   bool _update {false};
   bool _dirty {true};
-  bool _draw {true};
-  int _delta {0};
-  int _interval {300};
+  Tick _delta {0ms};
+  Tick _interval {300ms};
   std::deque<Cell> _sprite;
   std::unordered_map<char32_t, Xpr> _input;
 
-  void draw();
   void state_stopped();
   void state_moving();
 }; // class Snake
+
+class Egg : public Scene {
+public:
+  Egg(Ctx ctx);
+  Egg(Egg&&) = default;
+  Egg(Egg const&) = default;
+  ~Egg();
+  Egg& operator=(Egg&&) = default;
+  Egg& operator=(Egg const&) = default;
+  void on_winch();
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(std::string& buf);
+
+// private:
+  struct Color {
+    enum Dir {Up, Down};
+    Dir dir {Up};
+    std::size_t idx {0};
+    std::vector<std::string> body {aec::bg_true("#f7ff57"), aec::bg_true("#d8df4c"), aec::bg_true("#c6cc45"), aec::bg_true("#b3b93f"), aec::bg_true("#a2a739"), aec::bg_true("#909533")};
+  } _color;
+  bool _dirty {true};
+  Tick _delta {0ms};
+  Tick _interval {150ms};
+
+  void spawn();
+}; // class Egg
 
 class Prompt : public Scene {
 public:
@@ -259,9 +284,9 @@ public:
   Prompt& operator=(Prompt&&) = default;
   Prompt& operator=(Prompt const&) = default;
   void on_winch();
-  void on_input(Read::Ctx const& ctx);
-  bool on_update(int const delta);
-  bool on_render(std::ostream& buf);
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(std::string& buf);
 
 // private:
   Readline _readline;
@@ -276,8 +301,8 @@ public:
   } _color;
   std::string _buf;
   bool _status {false};
-  int _delta {0};
-  int _interval {8000};
+  Tick _delta {0ms};
+  Tick _interval {8000ms};
 
   void draw();
 }; // class Prompt
@@ -291,9 +316,9 @@ public:
   Status& operator=(Status&&) = default;
   Status& operator=(Status const&) = default;
   void on_winch();
-  void on_input(Read::Ctx const& ctx);
-  bool on_update(int const delta);
-  bool on_render(std::ostream& buf);
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(std::string& buf);
 
 // private:
   struct {
@@ -345,7 +370,7 @@ private:
   Tick _tick {static_cast<Tick>(1000 / _fps)};
   Timer _timer {_io};
   std::unordered_map<char32_t, Xpr> _input;
-  std::stringstream _buf;
+  std::string _buf;
 }; // class Game
 
 }; // namespace Nyble
