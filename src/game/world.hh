@@ -275,6 +275,29 @@ public:
   void spawn();
 }; // class Egg
 
+class Hud : public Scene {
+public:
+  Hud(Ctx ctx);
+  Hud(Hud&&) = default;
+  Hud(Hud const&) = default;
+  ~Hud();
+  Hud& operator=(Hud&&) = default;
+  Hud& operator=(Hud const&) = default;
+  void on_winch();
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(std::string& buf);
+
+// private:
+  struct {
+    std::string text {aec::fg_true("#ff5500") + aec::bg_true("#23262c")};
+  } _color;
+  bool _dirty {true};
+  int _score {0};
+
+  void score(int const val);
+}; // class Hud
+
 class Prompt : public Scene {
 public:
   Prompt(Ctx ctx);

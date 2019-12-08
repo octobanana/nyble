@@ -195,8 +195,8 @@ void Border::draw() {
 // Board -----------------------------------------------------------------------
 
 Board::Board(Ctx ctx) : Scene(ctx) {
-  _pos = Pos((_ctx._size.w / 4) - (_size.w / 2), (_ctx._size.h / 2) - (_size.h / 2));
   _size = Size([&]{if (auto const w = _ctx._size.w - 8; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 6);
+  _pos = Pos((_ctx._size.w / 4) - (_size.w / 2), (_ctx._size.h / 2) - (_size.h / 2));
 }
 
 Board::~Board() {
@@ -251,7 +251,7 @@ bool Board::on_render(std::string& buf) {
 void Board::draw() {
   _draw = false;
   _sprite.clear();
-  _size = Size([&]{if (auto const w = _ctx._size.w - 8; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 6);
+  // _size = Size([&]{if (auto const w = _ctx._size.w - 8; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 6);
   bool swap {false};
   for (std::size_t h = 0; h < _size.h; ++h) {
     _sprite.emplace_back(std::vector<Cell>());
@@ -520,9 +520,6 @@ void Snake::state_moving() {
   auto& egg = *std::dynamic_pointer_cast<Egg>(_ctx._scenes.at("egg"));
   if (head.x == egg._pos.x && head.y == egg._pos.y) {
     hit_egg = true;
-    // _tick.dec(3ms);
-    // _score += 10;
-    // update_score();
   }
 
   if (_ext) {
@@ -545,6 +542,8 @@ void Snake::state_moving() {
     _interval -= 5ms;
     if (_interval < 20ms) {_interval = 20ms;}
     egg.spawn();
+    auto& hud = *std::dynamic_pointer_cast<Hud>(_ctx._scenes.at("hud"));
+    hud.score(10);
   }
 
   // slow down tick rate if about to collide into wall
@@ -628,6 +627,54 @@ void Egg::spawn() {
   };
   do {_pos = {random_range(0, board.w - 1), random_range(0, board.h - 1)};}
   while (!is_valid());
+}
+
+// Hud -----------------------------------------------------------------------
+
+Hud::Hud(Ctx ctx) : Scene(ctx) {
+  on_winch();
+}
+
+Hud::~Hud() {
+}
+
+void Hud::on_winch() {
+  _dirty = true;
+  _size = Size(_ctx._size.w, 1);
+  _pos = Pos(0, _ctx._size.h - 2);
+}
+
+bool Hud::on_input(Read::Ctx const& ctx) {
+  return false;
+}
+
+bool Hud::on_update(Tick const delta) {
+  return false;
+}
+
+bool Hud::on_render(std::string& buf) {
+  if (_dirty) {
+    _dirty = false;
+    std::size_t size {0};
+    buf += aec::cursor_set(_pos.x + 1, _ctx._size.h - _pos.y);
+    buf += aec::fg_true("#23262c");
+    buf += aec::bg_true("#93a1a1");
+    buf += " SCORE ";
+    size += sizeof(" SCORE ");
+    buf += aec::bold;
+    buf += std::to_string(_score);
+    buf += aec::nbold;
+    size += std::to_string(_score).size();
+    for (size; size <= _size.w; ++size) {buf += " ";}
+    buf += aec::clear;
+    return true;
+  }
+  return false;
+}
+
+void Hud::score(int const val) {
+  _dirty = true;
+  _score += val;
 }
 
 // Prompt -----------------------------------------------------------------------
@@ -776,7 +823,6 @@ bool Status::on_render(std::string& buf) {
   std::size_t size {0};
   buf += aec::cursor_set(1, _size.h - 1);
   buf += aec::fg_true("#23262c");
-  buf += aec::bg_true("#93a1a1");
   buf += aec::bold;
   buf += aec::bg_cyan;
   buf += " NYBLE ";
@@ -785,9 +831,11 @@ bool Status::on_render(std::string& buf) {
   buf += aec::bg_true("#93a1a1");
   buf += " FPS ";
   size += sizeof(" FPS ");
+  buf += aec::bold;
   buf += std::to_string(_ctx._fps_actual);
+  buf += aec::nbold;
   size += std::to_string(_ctx._fps_actual).size();
-  for (std::size_t i = size; i < _size.w; ++i) {buf += " ";}
+  for (--size; size <= _size.w; ++size) {buf += " ";}
   buf += aec::clear;
   return false;
 }
@@ -1032,6 +1080,7 @@ void Game::run() {
   _scenes("board", std::make_shared<Board>(*this));
   _scenes("snake", std::make_shared<Snake>(*this));
   _scenes("egg", std::make_shared<Egg>(*this));
+  _scenes("hud", std::make_shared<Hud>(*this));
 
   _focus = "snake";
 
