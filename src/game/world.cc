@@ -93,6 +93,8 @@ void Background::draw() {
 // Border -----------------------------------------------------------------------
 
 Border::Border(Ctx ctx) : Scene(ctx) {
+  _size = Size([&]{if (auto const w = _ctx._size.w; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 2);
+  on_winch();
 }
 
 Border::~Border() {
@@ -100,6 +102,8 @@ Border::~Border() {
 
 void Border::on_winch() {
   _dirty = true;
+  _pos = Pos((_ctx._size.w / 4) - (_size.w / 2), (_ctx._size.h / 2) - (_size.h / 2));
+  if (_pos.y % 2) {++_pos.y;}
 }
 
 bool Border::on_input(Read::Ctx const& ctx) {
@@ -116,8 +120,6 @@ bool Border::on_render(std::string& buf) {
   }
   if (_dirty) {
     _dirty = false;
-    _pos = Pos((_ctx._size.w / 4) - (_size.w / 2), (_ctx._size.h / 2) - (_size.h / 2));
-    if (_pos.y % 2) {++_pos.y;}
     std::size_t y {0};
     for (auto const& row : _sprite) {
       buf += aec::cursor_set((_pos.x * 2) + 1, _ctx._size.h - (_pos.y + y++));
@@ -135,7 +137,6 @@ bool Border::on_render(std::string& buf) {
 void Border::draw() {
   _draw = false;
   _sprite.clear();
-  _size = Size([&]{if (auto const w = _ctx._size.w - 4; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 3);
   for (std::size_t y = 0; y < _size.h; ++y) {
     _sprite.emplace_back(std::vector<Cell>());
     auto& row = _sprite.back();
@@ -196,7 +197,7 @@ void Border::draw() {
 // Board -----------------------------------------------------------------------
 
 Board::Board(Ctx ctx) : Scene(ctx) {
-  _size = Size([&]{if (auto const w = _ctx._size.w - 8; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 5);
+  _size = Size([&]{if (auto const w = _ctx._size.w - 4; w % 2) {return (w - 1) / 2;} else {return w / 2;}}(), _ctx._size.h - 4);
   _pos = Pos((_ctx._size.w / 4) - (_size.w / 2), (_ctx._size.h / 2) - (_size.h / 2));
   if (_pos.y % 2 == 0) {++_pos.y;}
 }
@@ -634,6 +635,8 @@ void Egg::spawn() {
 // Hud -----------------------------------------------------------------------
 
 Hud::Hud(Ctx ctx) : Scene(ctx) {
+  auto const& border = *_ctx._scenes.at("border");
+  _size = Size((border._size.w * 2) - 4, 1);
   on_winch();
 }
 
@@ -642,8 +645,8 @@ Hud::~Hud() {
 
 void Hud::on_winch() {
   _dirty = true;
-  _size = Size(_ctx._size.w, 1);
-  _pos = Pos(0, _ctx._size.h - 1);
+  auto const& border = *_ctx._scenes.at("border");
+  _pos = Pos((border._pos.x * 2) + 2, border._pos.y + border._size.h - 1);
 }
 
 bool Hud::on_input(Read::Ctx const& ctx) {
@@ -658,16 +661,12 @@ bool Hud::on_render(std::string& buf) {
   if (_dirty) {
     _dirty = false;
     std::size_t size {0};
-    buf += aec::cursor_set(_pos.x + 1, _ctx._size.h - _pos.y);
-    buf += aec::fg_true("#23262c");
-    buf += aec::bg_true("#93a1a1");
-    buf += " SCORE ";
-    size += sizeof(" SCORE ");
+    size += std::to_string(_score).size();
+    buf += aec::cursor_set(_pos.x + (_size.w - size) + 1, _ctx._size.h - _pos.y);
+    buf += aec::fg_true("#a7d3e5");
+    buf += aec::bg_true("#1b1e24");
     buf += aec::bold;
     buf += std::to_string(_score);
-    buf += aec::nbold;
-    size += std::to_string(_score).size();
-    for (size; size <= _size.w; ++size) {buf += " ";}
     buf += aec::clear;
     return true;
   }
@@ -824,13 +823,14 @@ bool Status::on_update(Tick const delta) {
 bool Status::on_render(std::string& buf) {
   std::size_t size {0};
   buf += aec::cursor_set(1, _size.h - 1);
-  buf += aec::fg_true("#23262c");
+  buf += aec::fg_true("#2c323c");
   buf += aec::bold;
-  buf += aec::bg_cyan;
-  buf += " NYBLE ";
-  size += sizeof(" NYBLE ");
+  buf += aec::bg_true("#a7d3e5");
+  buf += " NYBLE 0.1.0 ";
+  size += sizeof(" NYBLE 0.1.0 ");
   buf += aec::nbold;
-  buf += aec::bg_true("#93a1a1");
+  buf += aec::fg_true("#a7d3e5");
+  buf += aec::bg_true("#2c323c");
   buf += " FPS ";
   size += sizeof(" FPS ");
   buf += aec::bold;

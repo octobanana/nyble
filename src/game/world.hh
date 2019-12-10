@@ -141,7 +141,7 @@ public:
     std::string value;
   };
   struct {
-    std::string primary {aec::bg_true("#23262c")};
+    std::string primary {aec::bg_true("#1b1e24")};
   } _color;
   std::vector<std::vector<Cell>> _sprite;
   bool _dirty {true};
@@ -169,7 +169,7 @@ public:
     std::string value;
   };
   struct {
-    std::string primary {aec::fg_true("#93a1a1") + aec::bg_true("#23262c")};
+    std::string primary {aec::fg_true("#f158dc") + aec::bg_true("#1b1e24")};
   } _color;
   std::vector<std::vector<Cell>> _sprite;
   bool _draw {true};
@@ -228,8 +228,8 @@ public:
   };
   struct {
     std::size_t idx {0};
-    std::string head {aec::bg_cyan};
-    std::vector<std::string> body {aec::bg_blue, aec::bg_blue_bright};
+    std::string head {aec::bg_true("#a7d3e5")};
+    std::vector<std::string> body {aec::bg_true("#8bb1bf"), aec::bg_true("#7595a1")};
   } _color;
   enum Dir {Up, Down, Left, Right};
   Dir _dir_prev {Up};
@@ -290,7 +290,7 @@ public:
 
 // private:
   struct {
-    std::string text {aec::fg_true("#ff5500") + aec::bg_true("#23262c")};
+    std::string text {aec::fg_true("#ff5500") + aec::bg_true("#1b1e24")};
   } _color;
   bool _dirty {true};
   int _score {0};
@@ -317,10 +317,10 @@ public:
   State _state {Clear};
   bool _dirty {false};
   struct {
-    std::string prompt {aec::fg_true("#ff5500") + aec::bg_true("#23262c")};
-    std::string text {aec::fg_true("#f0f0f0") + aec::bg_true("#23262c")};
-    std::string success {aec::fg_true("#55ff00") + aec::bg_true("#23262c")};
-    std::string error {aec::fg_true("#ff0000") + aec::bg_true("#23262c")};
+    std::string prompt {aec::fg_true("#ff5500") + aec::bg_true("#1b1e24")};
+    std::string text {aec::fg_true("#f0f0f0") + aec::bg_true("#1b1e24")};
+    std::string success {aec::fg_true("#55ff00") + aec::bg_true("#1b1e24")};
+    std::string error {aec::fg_true("#ff0000") + aec::bg_true("#1b1e24")};
   } _color;
   std::string _buf;
   bool _status {false};
@@ -345,7 +345,7 @@ public:
 
 // private:
   struct {
-    std::string text {aec::fg_true("#ff5500") + aec::bg_true("#23262c")};
+    std::string text {aec::fg_true("#ff5500") + aec::bg_true("#1b1e24")};
   } _color;
 }; // class Status
 
