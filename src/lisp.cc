@@ -996,7 +996,7 @@ void env_init(std::shared_ptr<Env> ev, int argc, char** argv) {
     throw std::runtime_error("invalid type '" + typ_str.at(type(x)) + "'");
   }}, ev, builtin};
 
-  (*ev)["pn"] = Val{Fun{str_lst("(())"), [&](auto e) -> Xpr {
+  (*ev)["pn"] = Val{Fun{str_lst("(@)"), [&](auto e) -> Xpr {
     auto x = eval(sym_xpr("@"), e);
     auto& l = std::get<Lst>(x);
     Xpr res {sym_xpr("F")};

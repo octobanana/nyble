@@ -40,11 +40,12 @@ public:
   std::string get();
   Readline& clear();
   Readline& refresh();
+  Readline& normal();
 
   void hist_push(std::string const& str);
   void hist_load(fs::path const& path);
 
-private:
+// private:
 
   // cursor
   void curs_begin();
@@ -207,69 +208,105 @@ private:
 
     Autocomplete& refresh()
     {
+      _lhs = _off ? "<" : "";
+      _rhs = _off + _max != _match.size() ? ">" : " ";
+
       std::ostringstream ss;
 
-      if (_off)
-      {
-        ss
-        << aec::clear
-        << _style.prompt
-        << "<"
-        << aec::clear
-        << _style.normal
-        << OB::String::repeat(_width - 2, aec::space)
-        << aec::clear
-        << _style.prompt
-        << (_off + _max != _match.size() ? ">" : " ")
-        << aec::clear
-        << _style.normal
-        << aec::cr << aec::cursor_right(1);
-      }
-      else
-      {
-        ss
-        << aec::clear
-        << _style.normal
-        << OB::String::repeat(_width - 1, aec::space)
-        << aec::clear
-        << _style.prompt
-        << (_off + _max != _match.size() ? ">" : " ")
-        << aec::clear
-        << _style.normal
-        << aec::cr;
-      }
-
-      for (std::size_t i = 0; i < _max; ++i)
+      for (std::size_t i = 0, n = _off ? 1ul : 0ul; i < _max; ++i)
       {
         if (i == _idx)
         {
-          ss
-          << aec::clear
-          << _style.select
-          << _match.at(i + _off)
-          << aec::clear
-          << _style.normal;
+          _hli = n;
+          _hls = _view.at(i + _off).cols();
+          ss << _match.at(i + _off);
         }
         else
         {
-          ss
-          << _match.at(i + _off);
+          ss << _match.at(i + _off);
         }
 
         if (i + 1 < _max)
         {
-          ss
-          << aec::space;
+          ss << " ";
+        }
+
+        if (i < _idx)
+        {
+          n += _view.at(i + _off).cols() + 1;
         }
       }
 
-      ss
-      << aec::clear;
-
-      _value = ss.str();
+      _text = ss.str();
 
       return *this;
     }
+
+    // Autocomplete& refresh()
+    // {
+    //   std::ostringstream ss;
+
+    //   if (_off)
+    //   {
+    //     ss
+    //     << aec::clear
+    //     << _style.prompt
+    //     << "<"
+    //     << aec::clear
+    //     << _style.normal
+    //     << OB::String::repeat(_width - 2, aec::space)
+    //     << aec::clear
+    //     << _style.prompt
+    //     << (_off + _max != _match.size() ? ">" : " ")
+    //     << aec::clear
+    //     << _style.normal
+    //     << aec::cr << aec::cursor_right(1);
+    //   }
+    //   else
+    //   {
+    //     ss
+    //     << aec::clear
+    //     << _style.normal
+    //     << OB::String::repeat(_width - 1, aec::space)
+    //     << aec::clear
+    //     << _style.prompt
+    //     << (_off + _max != _match.size() ? ">" : " ")
+    //     << aec::clear
+    //     << _style.normal
+    //     << aec::cr;
+    //   }
+
+    //   for (std::size_t i = 0; i < _max; ++i)
+    //   {
+    //     if (i == _idx)
+    //     {
+    //       ss
+    //       << aec::clear
+    //       << _style.select
+    //       << _match.at(i + _off)
+    //       << aec::clear
+    //       << _style.normal;
+    //     }
+    //     else
+    //     {
+    //       ss
+    //       << _match.at(i + _off);
+    //     }
+
+    //     if (i + 1 < _max)
+    //     {
+    //       ss
+    //       << aec::space;
+    //     }
+    //   }
+
+    //   ss
+    //   << aec::clear;
+
+    //   _value = ss.str();
+
+    //   return *this;
+    // }
 
     Autocomplete& begin()
     {
@@ -477,6 +514,12 @@ private:
       std::string normal;
       std::string select {aec::reverse};
     } _style;
+
+    std::size_t _hli {0}; // highlight index
+    std::size_t _hls {0}; // highlight size
+    std::string _lhs;
+    std::string _rhs;
+    std::string _text;
 
     // string value
     std::string _value;

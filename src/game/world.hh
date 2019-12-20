@@ -5,6 +5,8 @@
 #include "ob/parg.hh"
 #include "ob/text.hh"
 #include "ob/term.hh"
+#include "ob/timer.hh"
+#include "ob/color.hh"
 #include "ob/readline.hh"
 #include "ob/ordered_map.hh"
 #include "ob/belle/io.hh"
@@ -59,9 +61,9 @@ using Read = OB::Belle::IO::Read;
 using Key = OB::Belle::IO::Read::Key;
 using Mouse = OB::Belle::IO::Read::Mouse;
 using Tick = std::chrono::milliseconds;
-using Clock = std::chrono::high_resolution_clock;
+using Clock = std::chrono::steady_clock;
 using Readline = OB::Readline;
-using Timer = OB::Belle::asio::high_resolution_timer;
+using Timer = OB::Belle::asio::steady_timer;
 using error_code = OB::Belle::error_code;
 using namespace std::chrono_literals;
 using namespace std::string_literals;
@@ -97,6 +99,76 @@ struct Size {
   Size& operator=(Size const&) = default;
 };
 
+struct Color {
+  std::uint8_t r {0};
+  std::uint8_t g {0};
+  std::uint8_t b {0};
+  Color(std::uint8_t const r, std::uint8_t const g, std::uint8_t const b) : r {r}, g {g}, b {b} {}
+  Color() = default;
+  Color(Color&&) = default;
+  Color(Color const&) = default;
+  ~Color() = default;
+  Color& operator=(Color&&) = default;
+  Color& operator=(Color const&) = default;
+};
+
+Color hex_to_rgb(std::string const& str);
+
+struct Style {
+  Style() = default;
+  Style(Style&&) = default;
+  Style(Style const&) = default;
+  ~Style() = default;
+  Style& operator=(Style&&) = default;
+  Style& operator=(Style const&) = default;
+  friend std::ostream& operator<<(std::ostream& os, Style const& obj);
+  enum Type : std::uint8_t {
+    Bit_2 = 0,
+    Bit_4,
+    Bit_8,
+    Bit_24,
+  };
+  enum Attr : std::uint8_t {
+    Null = 0,
+    Bold = 1 << 0,
+    Reverse = 1 << 1,
+  };
+  std::uint8_t type {Bit_24};
+  std::uint8_t attr {Null};
+  Color fg;
+  Color bg;
+};
+
+struct Cell {
+  Style style;
+  std::string text;
+};
+
+class Buffer {
+public:
+  Buffer() = default;
+  Buffer(Buffer&&) = default;
+  Buffer(Buffer const&) = default;
+  ~Buffer() = default;
+  Buffer& operator=(Buffer&&) = default;
+  Buffer& operator=(Buffer const&) = default;
+  void operator()(Cell const& cell);
+  Cell& at(Pos const& pos);
+  std::vector<Cell>& row(std::size_t y);
+  Cell& col(Pos const& pos);
+  Pos cursor();
+  void cursor(Pos const& pos);
+  Size size();
+  void size(Size const& size);
+  bool empty();
+  void clear();
+
+private:
+  Pos _pos;
+  Size _size;
+  std::vector<std::vector<Cell>> _value;
+}; // class Buffer
+
 class Game;
 
 using Ctx = Game&;
@@ -109,15 +181,14 @@ public:
   virtual ~Scene() = default;
   Scene& operator=(Scene&&) = default;
   Scene& operator=(Scene const&) = default;
-  virtual void on_winch() = 0;
+  virtual void on_winch(Size const& size) = 0;
   virtual bool on_input(Read::Ctx const& ctx) = 0;
   virtual bool on_update(Tick const delta) = 0;
-  virtual bool on_render(std::string& buf) = 0;
+  virtual bool on_render(Buffer& buf) = 0;
 
   Ctx _ctx;
   Pos _pos;
   Size _size;
-  std::vector<Pos> _patch;
 }; // class Scene
 
 using Scenes = OB::Ordered_map<std::string, std::shared_ptr<Scene>>;
@@ -130,53 +201,14 @@ public:
   ~Background();
   Background& operator=(Background&&) = default;
   Background& operator=(Background const&) = default;
-  void on_winch();
+  void on_winch(Size const& size);
   bool on_input(Read::Ctx const& ctx);
   bool on_update(Tick const delta);
-  bool on_render(std::string& buf);
+  bool on_render(Buffer& buf);
 
 // private:
-  struct Cell {
-    std::string const* style;
-    std::string value;
-  };
-  struct {
-    std::string primary {aec::bg_true("#1b1e24")};
-  } _color;
-  std::vector<std::vector<Cell>> _sprite;
-  bool _dirty {true};
-  bool _draw {true};
-
-  void draw();
+  Cell _cell {Style{Style::Bit_24, Style::Null, Color{}, hex_to_rgb("031323")}, " "};
 }; // class Background
-
-class Border : public Scene {
-public:
-  Border(Ctx ctx);
-  Border(Border&&) = default;
-  Border(Border const&) = default;
-  ~Border();
-  Border& operator=(Border&&) = default;
-  Border& operator=(Border const&) = default;
-  void on_winch();
-  bool on_input(Read::Ctx const& ctx);
-  bool on_update(Tick const delta);
-  bool on_render(std::string& buf);
-
-// private:
-  struct Cell {
-    std::string const* style {nullptr};
-    std::string value;
-  };
-  struct {
-    std::string primary {aec::fg_true("#f158dc") + aec::bg_true("#1b1e24")};
-  } _color;
-  std::vector<std::vector<Cell>> _sprite;
-  bool _draw {true};
-  bool _dirty {true};
-
-  void draw();
-}; // class Border
 
 class Board : public Scene {
 public:
@@ -186,25 +218,16 @@ public:
   ~Board();
   Board& operator=(Board&&) = default;
   Board& operator=(Board const&) = default;
-  void on_winch();
+  void on_winch(Size const& size);
   bool on_input(Read::Ctx const& ctx);
   bool on_update(Tick const delta);
-  bool on_render(std::string& buf);
+  bool on_render(Buffer& buf);
 
 // private:
-  struct Cell {
-    std::string const* style {nullptr};
-    std::string value;
-  };
-  struct {
-    std::string primary {aec::bg_true("#1b1e24")};
-    std::string secondary {aec::bg_true("#2c323c")};
-  } _color;
-  std::vector<std::vector<Cell>> _sprite;
-  bool _dirty {true};
-  bool _draw {true};
-
-  void draw();
+  Style _style {Style::Bit_24, Style::Null, hex_to_rgb("0b253d"), hex_to_rgb("031323")};
+  Style _block1 {Style::Bit_24, Style::Null, Color(), hex_to_rgb("031323")};
+  Style _block2 {Style::Bit_24, Style::Null, Color(), hex_to_rgb("0b253d")};
+  bool _init {true};
 }; // class Board
 
 class Snake : public Scene {
@@ -215,34 +238,48 @@ public:
   ~Snake();
   Snake& operator=(Snake&&) = default;
   Snake& operator=(Snake const&) = default;
-  void on_winch();
+  void on_winch(Size const& size);
   bool on_input(Read::Ctx const& ctx);
   bool on_update(Tick const delta);
-  bool on_render(std::string& buf);
+  bool on_render(Buffer& buf);
 
 // private:
-  struct Cell {
-    std::string const* style {nullptr};
-    std::string value;
-    Pos pos;
-  };
+
   struct {
     std::size_t idx {0};
-    std::string head {aec::bg_true("#a7d3e5")};
-    std::vector<std::string> body {aec::bg_true("#8bb1bf"), aec::bg_true("#7595a1")};
-  } _color;
+    std::vector<Style> body {
+      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("43c7c3")},
+      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("3aaca8")}
+    };
+    Style head {Style::Bit_24, Style::Null, Color(), hex_to_rgb("4feae7")};
+  } _style;
+
+  std::string _text {"  "};
+
+  struct Block {
+    Pos pos;
+    Style* style;
+    std::string_view value;
+  };
+
+  std::deque<Block> _sprite;
+
+  bool _init {true};
   enum Dir {Up, Down, Left, Right};
   Dir _dir_prev {Up};
   enum State {Stopped, Moving};
   State _state {Stopped};
   std::deque<Dir> _dir;
   std::size_t _ext {2};
-  bool _update {false};
-  bool _dirty {true};
   Tick _delta {0ms};
   Tick _interval {300ms};
-  std::deque<Cell> _sprite;
   std::unordered_map<char32_t, Xpr> _input;
+
+  enum Special {Null, Party, Rainbow};
+  int _special {Special::Null};
+  Tick _special_delta {0ms};
+  Tick _special_interval {_interval / 2};
+  OB::Color _color;
 
   void state_stopped();
   void state_moving();
@@ -256,47 +293,33 @@ public:
   ~Egg();
   Egg& operator=(Egg&&) = default;
   Egg& operator=(Egg const&) = default;
-  void on_winch();
+  void on_winch(Size const& size);
   bool on_input(Read::Ctx const& ctx);
   bool on_update(Tick const delta);
-  bool on_render(std::string& buf);
+  bool on_render(Buffer& buf);
 
 // private:
-  struct Color {
+
+  struct Styles {
     enum Dir {Up, Down};
     Dir dir {Up};
     std::size_t idx {0};
-    std::vector<std::string> body {aec::bg_true("#f7ff57"), aec::bg_true("#d8df4c"), aec::bg_true("#c6cc45"), aec::bg_true("#b3b93f"), aec::bg_true("#a2a739"), aec::bg_true("#909533")};
-  } _color;
-  bool _dirty {true};
+    std::vector<Style> body {
+      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("f7ff57")},
+      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("d8df4c")},
+      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("c6cc45")},
+      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("b3b93f")},
+      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("a2a739")},
+      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("909533")}
+    };
+  } _style;
+  std::string _text {"  "};
+  bool _init {true};
   Tick _delta {0ms};
   Tick _interval {150ms};
 
   void spawn();
 }; // class Egg
-
-class Hud : public Scene {
-public:
-  Hud(Ctx ctx);
-  Hud(Hud&&) = default;
-  Hud(Hud const&) = default;
-  ~Hud();
-  Hud& operator=(Hud&&) = default;
-  Hud& operator=(Hud const&) = default;
-  void on_winch();
-  bool on_input(Read::Ctx const& ctx);
-  bool on_update(Tick const delta);
-  bool on_render(std::string& buf);
-
-// private:
-  struct {
-    std::string text {aec::fg_true("#ff5500") + aec::bg_true("#1b1e24")};
-  } _color;
-  bool _dirty {true};
-  int _score {0};
-
-  void score(int const val);
-}; // class Hud
 
 class Prompt : public Scene {
 public:
@@ -306,22 +329,21 @@ public:
   ~Prompt();
   Prompt& operator=(Prompt&&) = default;
   Prompt& operator=(Prompt const&) = default;
-  void on_winch();
+  void on_winch(Size const& size);
   bool on_input(Read::Ctx const& ctx);
   bool on_update(Tick const delta);
-  bool on_render(std::string& buf);
+  bool on_render(Buffer& buf);
 
 // private:
   Readline _readline;
   enum State {Clear, Typing, Display};
   State _state {Clear};
-  bool _dirty {false};
   struct {
-    std::string prompt {aec::fg_true("#ff5500") + aec::bg_true("#1b1e24")};
-    std::string text {aec::fg_true("#f0f0f0") + aec::bg_true("#1b1e24")};
-    std::string success {aec::fg_true("#55ff00") + aec::bg_true("#1b1e24")};
-    std::string error {aec::fg_true("#ff0000") + aec::bg_true("#1b1e24")};
-  } _color;
+    Style prompt {Style::Bit_24, Style::Null, hex_to_rgb("ff5500"), hex_to_rgb("031323")};
+    Style text {Style::Bit_24, Style::Null, hex_to_rgb("f0f0f0"), hex_to_rgb("031323")};
+    Style success {Style::Bit_24, Style::Null, hex_to_rgb("55ff00"), hex_to_rgb("031323")};
+    Style error {Style::Bit_24, Style::Null, hex_to_rgb("ff0000"), hex_to_rgb("031323")};
+  } _style;
   std::string _buf;
   bool _status {false};
   Tick _delta {0ms};
@@ -338,16 +360,63 @@ public:
   ~Status();
   Status& operator=(Status&&) = default;
   Status& operator=(Status const&) = default;
-  void on_winch();
+  void on_winch(Size const& size);
   bool on_input(Read::Ctx const& ctx);
   bool on_update(Tick const delta);
-  bool on_render(std::string& buf);
+  bool on_render(Buffer& buf);
 
 // private:
   struct {
-    std::string text {aec::fg_true("#ff5500") + aec::bg_true("#1b1e24")};
-  } _color;
+    Style line {Style::Bit_24, Style::Null, Color(), hex_to_rgb("0b253d")};
+    Style name {Style::Bit_24, Style::Bold, hex_to_rgb("031323"), hex_to_rgb("6735a4")};
+    Style key {Style::Bit_24, Style::Bold, hex_to_rgb("8242cf"), hex_to_rgb("0b253d")};
+    Style val {Style::Bit_24, Style::Null, hex_to_rgb("b140a2"), hex_to_rgb("0b253d")};
+  } _style;
+  struct {
+    std::string line {" "};
+    std::string name {" NYBLE 0.3.0 "};
+    std::string fps {" FPS "};
+    std::string fpsv;
+    std::string dir;
+  } _text;
+  struct {
+    std::string up {"↑"};
+    std::string down {"↓"};
+    std::string left {"←"};
+    std::string right {"→"};
+  } _sym;
+
+  void widget_fps();
+  void widget_dir();
 }; // class Status
+
+class Main : public Scene {
+public:
+  Main(Ctx ctx);
+  Main(Main&&) = default;
+  Main(Main const&) = default;
+  ~Main();
+  Main& operator=(Main&&) = default;
+  Main& operator=(Main const&) = default;
+  void on_winch(Size const& size);
+  bool on_input(Read::Ctx const& ctx);
+  bool on_update(Tick const delta);
+  bool on_render(Buffer& buf);
+
+  bool on_read(Read::Null const& ctx);
+  bool on_read(Read::Mouse const& ctx);
+  bool on_read(Read::Key const& ctx);
+
+// private:
+  Buffer _buf;
+  Scenes _scenes;
+  bool _dirty {true};
+  std::string _focus;
+  std::unordered_map<char32_t, Xpr> _input;
+
+  std::string _code;
+  std::chrono::time_point<Clock> _code_begin {(Clock::time_point::min)()};
+}; // class Main
 
 class Game final {
 public:
@@ -359,13 +428,12 @@ public:
   Game& operator=(Game const&) = delete;
   void run();
 
-  Size _size;
-  Scenes _scenes;
-  std::shared_ptr<Env> _env {std::make_shared<Env>()};
-  std::string _focus;
+  std::shared_ptr<Scene> _main;
   int _fps_actual {0};
+  int _fps_dropped {0};
+  std::shared_ptr<Env> _env {std::make_shared<Env>()};
 
-private:
+// private:
   void start();
   void stop();
   void winch();
@@ -375,211 +443,32 @@ private:
   void await_signal();
   void await_read();
   void await_tick();
-  void on_tick(error_code const& ec);
+  void on_tick(error_code const& ec, Tick const delta);
   bool on_read(Read::Null const& ctx);
   bool on_read(Read::Mouse const& ctx);
   bool on_read(Read::Key const& ctx);
-  void buf_clear();
-  void buf_flush();
+  void write();
 
   OB::Parg& _pg;
   Belle::asio::io_context _io {1};
   Belle::Signal _sig {_io};
   Read _read {_io};
   Term::Mode _term_mode;
+  Size _size;
   std::chrono::time_point<Clock> _tick_begin {(Clock::time_point::min)()};
   std::chrono::time_point<Clock> _tick_end {(Clock::time_point::min)()};
   int _fps {30};
   Tick _tick {static_cast<Tick>(1000 / _fps)};
   Timer _timer {_io};
   std::unordered_map<char32_t, Xpr> _input;
-  std::string _buf;
+
+  std::size_t _bsize {0};
+  Buffer _buf;
+  Buffer _buf_prev;
+  Style _style;
+  std::string _line;
 }; // class Game
 
 }; // namespace Nyble
-
-
-
-
-
-
-
-
-// std::visit([&](auto const& e) {input(e);}, ctx);
-// auto const key = std::get_if<Key>(&ctx);
-// if (!key) {return;}
-// if (auto const v = _input.find(key->ch); v != _input.end()) {
-//   eval(v->second, _env);
-// }
-
-
-
-
-
-
-
-
-
-// struct Egg {
-//   Point pos;
-//   std::string sprite {"  "};
-//   std::string color {aec::bg_magenta_bright};
-//   Egg() = default;
-//   Egg(Egg&&) = default;
-//   Egg(Egg const&) = default;
-//   ~Egg() = default;
-//   Egg& operator=(Egg&&) = default;
-//   Egg& operator=(Egg const&) = default;
-// };
-
-// struct Snake {
-//   enum Dir {up, down, left, right};
-//   std::deque<Dir> dir;
-//   Dir dir_prev {up};
-//   std::deque<Point> pos;
-//   std::size_t ext {0};
-//   std::string sprite {"  "};
-//   struct {
-//     std::size_t idx {0};
-//     std::string head {aec::bg_cyan};
-//     std::vector<std::string> body {aec::bg_blue, aec::bg_blue_bright};
-//   } color;
-//   Snake() = default;
-//   Snake(Snake&&) = default;
-//   Snake(Snake const&) = default;
-//   ~Snake() = default;
-//   Snake& operator=(Snake&&) = default;
-//   Snake& operator=(Snake const&) = default;
-// };
-
-// class World final {
-// public:
-//   World(OB::Parg& pg) : _pg {pg} {}
-//   World(World&&) = default;
-//   World(World const&) = delete;
-//   ~World() = default;
-//   World& operator=(World&&) = default;
-//   World& operator=(World const&) = delete;
-//   void run();
-
-// private:
-//   OB::Parg& _pg;
-//   Readline _readline;
-//   Belle::asio::io_context _io {1};
-//   Belle::Signal _sig {_io};
-//   Belle::IO::Read _read {_io};
-//   Term::Mode _term_mode;
-
-//   std::chrono::time_point<std::chrono::high_resolution_clock> _time_render_begin {(std::chrono::high_resolution_clock::time_point::min)()};
-//   std::chrono::time_point<std::chrono::high_resolution_clock> _time_render_end {(std::chrono::high_resolution_clock::time_point::min)()};
-//   std::chrono::milliseconds _tick_min {20ms};
-//   std::chrono::milliseconds _tick_max {10ms};
-//   std::chrono::milliseconds _tick_default {16ms};
-//   Tick<std::chrono::milliseconds> _tick {_tick_min, _tick_max, _tick_default};
-//   Belle::asio::high_resolution_timer _timer {_io, _tick.val()};
-
-//   std::stringstream _buf;
-//   std::size_t _win_width {0};
-//   std::size_t _win_height {0};
-//   std::size_t _grid_width {0};
-//   std::size_t _grid_height {0};
-//   std::shared_ptr<Env> _env {std::make_shared<Env>()};
-
-//   Egg _egg;
-//   Snake _snake;
-//   std::size_t _score {0};
-
-//   struct {
-//     std::string border {aec::fg_cyan};
-//     std::string score_text {aec::fg_cyan};
-//     std::string score_value {aec::fg_magenta};
-//     std::string grid_primary {aec::bg_true("#1b1e24")};
-//     std::string grid_secondary {aec::bg_true("#2c323c")};
-//   } _color;
-
-//   enum class State {menu, start, game, end, prompt};
-//   State _state {State::menu};
-//   std::stack<State> _state_stk;
-
-//   void buf_clear();
-//   void buf_print();
-//   void win_size();
-//   std::string win_clear();
-//   std::string win_cursor(Point const& obj);
-//   std::string grid_cursor(Point const& obj);
-
-//   void draw_border(Point const& pos, Size const& size, std::function<void(Point const&)> const& fx, std::function<void(Point const&)> const& fy);
-//   void draw_rect(Point const& pos, Size const& size, std::function<void(Point const&)> const& fx, std::function<void(Point const&)> const& fy);
-//   void draw_grid(Point const& pos, std::size_t const w, std::size_t const h);
-//   void draw_score();
-//   void update_score();
-//   void spawn_egg();
-//   void game_redraw();
-//   void game_menu();
-//   void game_init();
-//   void game_play();
-//   void game_over();
-
-//   void signals();
-//   void lang();
-
-//   void do_timer();
-//   void on_timer(Belle::error_code const& ec);
-
-//   std::unordered_map<char32_t, Xpr> _input_key;
-//   void input_play(Belle::IO::Read::Ctx const& ctx);
-//   void input_prompt(Belle::IO::Read::Ctx const& ctx);
-//   void input();
-// };
-
-// template<typename T>
-// class Tick {
-// public:
-//   Tick(T const t, T const min, T const max) : _min {min}, _max {max} {val(t);}
-//   Tick(Tick&&) = default;
-//   Tick(Tick const&) = default;
-//   ~Tick() = default;
-//   Tick& operator=(Tick&&) = default;
-//   Tick& operator=(Tick const&) = default;
-//   Tick& slow() {
-//     _mode = Mode::slow;
-//     return *this;
-//   }
-//   Tick& norm() {
-//     _mode = Mode::norm;
-//     return *this;
-//   }
-//   T const& min() {
-//     return _min;
-//   }
-//   T const& max() {
-//     return _max;
-//   }
-//   T const& val() {
-//     return _mode == Mode::norm ? _val : _max;
-//   }
-//   Tick& val(T const& t) {
-//     if (t > _max) {_val = _max;}
-//     else if (t < _min) {_val = _min;}
-//     else {_val = t;}
-//     return *this;
-//   }
-//   Tick& inc(T const& t) {
-//     if (_val + t > _max) {_val = _max;}
-//     else {_val += t;}
-//     return *this;
-//   }
-//   Tick& dec(T const& t) {
-//     if (_val - t < _min) {_val = _min;}
-//     else {_val -= t;}
-//     return *this;
-//   }
-// private:
-//   T _min;
-//   T _max;
-//   T _val;
-//   enum class Mode {slow, norm};
-//   Mode _mode {Mode::norm};
-// };
 
 #endif

@@ -178,8 +178,8 @@ std::string Readline::render() const
 
 Readline& Readline::refresh()
 {
-  _prompt.lhs = _prompt.fmt;
-  _prompt.rhs.clear();
+  _prompt.lhs = ">";
+  _prompt.rhs = " ";
 
   if (_input.str.cols() + 2 > _width)
   {
@@ -213,7 +213,7 @@ Readline& Readline::refresh()
         _input.cur = 0;
       }
 
-      _prompt.lhs = aec::wrap("<", _style.prompt);
+      _prompt.lhs = "<";
     }
     else
     {
@@ -234,9 +234,7 @@ Readline& Readline::refresh()
 
     if (_input.off + _input.idx < _input.str.size())
     {
-      _prompt.rhs = aec::wrap(
-        OB::String::repeat(_width - _input.fmt.cols() - 2, " ") + ">",
-        _style.prompt);
+      _prompt.rhs = ">";
     }
   }
   else
@@ -252,6 +250,83 @@ Readline& Readline::refresh()
 
   return *this;
 }
+
+// Readline& Readline::refresh()
+// {
+//   _prompt.lhs = _prompt.fmt;
+//   _prompt.rhs.clear();
+
+//   if (_input.str.cols() + 2 > _width)
+//   {
+//     std::size_t pos {_input.off + _input.idx - 1};
+//     std::size_t cols {0};
+
+//     for (; pos != OB::Text::String::npos && cols < _width - 2; --pos)
+//     {
+//       cols += _input.str.at(pos).cols;
+//     }
+
+//     if (pos == OB::Text::String::npos)
+//     {
+//       pos = 0;
+//     }
+
+//     std::size_t end {_input.off + _input.idx - pos};
+//     _input.fmt.str(_input.str.substr(pos, end));
+
+//     if (_input.fmt.cols() > _width - 2)
+//     {
+//       while (_input.fmt.cols() > _width - 2)
+//       {
+//         _input.fmt.erase(0, 1);
+//       }
+
+//       _input.cur = _input.fmt.cols();
+
+//       if (_input.cur == OB::Text::String::npos)
+//       {
+//         _input.cur = 0;
+//       }
+
+//       _prompt.lhs = aec::wrap("<", _style.prompt);
+//     }
+//     else
+//     {
+//       _input.cur = _input.fmt.cols();
+
+//       if (_input.cur == OB::Text::String::npos)
+//       {
+//         _input.cur = 0;
+//       }
+
+//       while (_input.fmt.cols() <= _width - 2)
+//       {
+//         _input.fmt.append(std::string(_input.str.at(end++).str));
+//       }
+
+//       _input.fmt.erase(_input.fmt.size() - 1, 1);
+//     }
+
+//     if (_input.off + _input.idx < _input.str.size())
+//     {
+//       _prompt.rhs = aec::wrap(
+//         OB::String::repeat(_width - _input.fmt.cols() - 2, " ") + ">",
+//         _style.prompt);
+//     }
+//   }
+//   else
+//   {
+//     _input.fmt = _input.str;
+//     _input.cur = _input.fmt.cols(0, _input.idx);
+
+//     if (_input.cur == OB::Text::String::npos)
+//     {
+//       _input.cur = 0;
+//     }
+//   }
+
+//   return *this;
+// }
 
 Readline& Readline::size(std::size_t const width_, std::size_t const height_)
 {
@@ -276,6 +351,18 @@ std::string Readline::get()
   return _res;
 }
 
+Readline& Readline::normal()
+{
+  mode(Mode::normal);
+  _input.off = _input.offp;
+  _input.idx = _input.idxp;
+  _input.str = _input.buf;
+  hist_reset();
+  refresh();
+
+  return *this;
+}
+
 bool Readline::operator()(OB::Text::Char32 input)
 {
   bool loop {true};
@@ -286,12 +373,7 @@ bool Readline::operator()(OB::Text::Char32 input)
     {
       if (_mode != Mode::normal)
       {
-        mode(Mode::normal);
-        _input.off = _input.offp;
-        _input.idx = _input.idxp;
-        _input.str = _input.buf;
-        hist_reset();
-        refresh();
+        normal();
 
         break;
       }
@@ -408,14 +490,14 @@ bool Readline::operator()(OB::Text::Char32 input)
         case Mode::autocomplete_init:
         {
           mode(Mode::autocomplete);
-          ac_next_section();
+          ac_prev_section();
 
           break;
         }
 
         case Mode::autocomplete:
         {
-          ac_next_section();
+          ac_prev_section();
 
           break;
         }
@@ -455,14 +537,14 @@ bool Readline::operator()(OB::Text::Char32 input)
         case Mode::autocomplete_init:
         {
           mode(Mode::autocomplete);
-          ac_prev_section();
+          ac_next_section();
 
           break;
         }
 
         case Mode::autocomplete:
         {
-          ac_prev_section();
+          ac_next_section();
 
           break;
         }

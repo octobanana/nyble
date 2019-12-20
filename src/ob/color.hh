@@ -202,7 +202,7 @@ public:
 
   Color& step(double const val = 0)
   {
-    if (val)
+    if (val != 0)
     {
       _hsl.h += val;
 
@@ -450,6 +450,16 @@ public:
   std::string hex() const
   {
     return hsl_to_hex(_hsl);
+  }
+
+  RGB rgb() const
+  {
+    return hsl_to_rgb(_hsl);
+  }
+
+  HSL hsl() const
+  {
+    return _hsl;
   }
 
   static HSL hex_to_hsl(std::string const& hex)

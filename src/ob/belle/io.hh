@@ -253,7 +253,7 @@ private:
         }
         else {
           if (_buf[_pos_read] != 0x1b) {
-            _ctx = Key{{&_buf[_pos_read], 1}, _buf[_pos_read]};
+            _ctx = Key{{&_buf[_pos_read], 1}, static_cast<char32_t>(_buf[_pos_read])};
             _pos_read += 1;
           }
           else {
@@ -272,7 +272,7 @@ private:
               }
               catch (...) {
                 // escape
-                _ctx = Key{{&_buf[_pos_read], 1}, _buf[_pos_read]};
+                _ctx = Key{{&_buf[_pos_read], 1}, static_cast<char32_t>(_buf[_pos_read])};
                 _pos_read += 1;
               }
             }
@@ -281,6 +281,7 @@ private:
               if (_pos_read + 2 >= _buf_size) {
                 goto read_more;
               }
+              // std::cerr << "read> " << _buf[_pos_read + 2] << "\n";
 
               if (_buf[_pos_read + 2] >= '0' && _buf[_pos_read + 2] <= '9') {
                 if (_pos_read + 3 >= _buf_size) {
@@ -323,6 +324,18 @@ private:
               else
               {
                 switch (_buf[_pos_read + 2]) {
+                  // case 'I': {
+                  //   // TODO add Event Ctx variant type
+                  //   _ctx = Null{{&_buf[_pos_read], 4}};
+                  //   _pos_read += 4;
+                  //   break;
+                  // }
+                  // case 'O': {
+                  //   // TODO add Event Ctx variant type
+                  //   _ctx = Null{{&_buf[_pos_read], 4}};
+                  //   _pos_read += 4;
+                  //   break;
+                  // }
                   case 'A': {
                     _ctx = Key{{&_buf[_pos_read], 3}, Key::Up};
                     _pos_read += 3;
@@ -468,7 +481,7 @@ private:
             }
             else {
               // escape
-              _ctx = Key{{&_buf[_pos_read], 1}, _buf[_pos_read]};
+              _ctx = Key{{&_buf[_pos_read], 1}, static_cast<char32_t>(_buf[_pos_read])};
               _pos_read += 1;
             }
           }

@@ -70,10 +70,10 @@ inline void program_init(OB::Parg& pg)
   pg.usage("[--colour=<on|off|auto>] --license");
 
   pg.info({"Key Bindings", {
-    {"q, <ctrl-c>", "quit the program"},
+    {"<ctrl-c>", "quit the program"},
     {":", "enter the command prompt"},
     {"<space>", "start/pause the game"},
-    {"?", "show the help output"},
+    // {"?", "show the help output"},
     {"r", "restart the game"},
     {",", "move left, 2 key mode"},
     {".", "move right, 2 key mode"},
@@ -83,9 +83,10 @@ inline void program_init(OB::Parg& pg)
     {"<right>, d, l", "move right"},
   }});
 
-  pg.info({"Prompt Bindings", {
-    {"<esc>, <ctrl-c>", "exit the prompt"},
+  pg.info({"Command Prompt Bindings", {
+    {"<esc>", "exit the prompt"},
     {"<enter>", "submit the input"},
+    {"<tab>", "enter autocomplete mode"},
     {"<ctrl-u>", "clear the prompt"},
     {"<up>, <ctrl-p>", "previous history value based on current input"},
     {"<down>, <ctrl-n>", "next history value based on current input"},
@@ -95,6 +96,17 @@ inline void program_init(OB::Parg& pg)
     {"<end>, <ctrl-e>", "move cursor to the end of the input"},
     {"<delete>, <ctrl-d>", "delete character under the cursor or delete previous character if cursor is at the end of the input"},
     {"<backspace>, <ctrl-h>", "delete previous character"},
+  }});
+
+  pg.info({"Autocomplete Prompt Bindings", {
+    {"<esc>", "exit autocomplete mode"},
+    {"<enter>", "select value under cursor"},
+    {"<up>, <ctrl-p>", "move cursor to start of previous section"},
+    {"<down>, <ctrl-n>", "move cursor to start of next section"},
+    {"<left>, <ctrl-b>", "move cursor left"},
+    {"<right>, <ctrl-f>", "move cursor right"},
+    {"<home>, <ctrl-a>", "move cursor to the start of first section"},
+    {"<end>, <ctrl-e>", "move cursor to the start of last section"},
   }});
 
   pg.info({"Examples", {

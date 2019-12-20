@@ -764,6 +764,10 @@ std::string const clear {esc + "[0m"};
 std::string const mouse_enable {esc + "[?1000;1006h"};
 std::string const mouse_disable {esc + "[?1000;1006l"};
 
+// focus
+std::string const focus_enable {esc + "[?1004h"};
+std::string const focus_disable {esc + "[?1004l"};
+
 // bracketed paste
 std::string const paste_enable {esc + "[?2004h"};
 std::string const paste_disable {esc + "[?2004l"};
