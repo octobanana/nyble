@@ -61,7 +61,7 @@ inline void program_init(OB::Parg& pg);
 
 inline void program_init(OB::Parg& pg)
 {
-  pg.name("nyble").version("0.1.0 (18.11.2019)");
+  pg.name("nyble").version("0.4.0 (22.12.2019)");
   pg.description("A snake game for the terminal.");
 
   pg.usage("");
@@ -71,12 +71,19 @@ inline void program_init(OB::Parg& pg)
 
   pg.info({"Key Bindings", {
     {"<ctrl-c>", "quit the program"},
+    {"<ctrl-z>", "suspend the program"},
+    {"<ctrl-l>", "force screen redraw"},
     {":", "enter the command prompt"},
     {"<space>", "start/pause the game"},
-    // {"?", "show the help output"},
     {"r", "restart the game"},
+    {"R", "restart the game and fit game window to the screen"},
+    {"1", "coil the body of the snake to a size of 3, and then extend itself back to its previous size"},
+    {"2", "reverse the snakes direction, swapping the head with the tail"},
+    {"3", "toggle fixed movement of the snake, a direction key must be pressed or held to move the snake"},
     {",", "move left, 2 key mode"},
     {".", "move right, 2 key mode"},
+    {"<", "u-turn left, 2 key mode"},
+    {">", "u-turn right, 2 key mode"},
     {"<up>, w, k", "move up"},
     {"<down>, s, j", "move down"},
     {"<left>, a, h", "move left"},

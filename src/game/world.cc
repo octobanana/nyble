@@ -1,3 +1,48 @@
+/*
+                                    88888888
+                                  888888888888
+                                 88888888888888
+                                8888888888888888
+                               888888888888888888
+                              888888  8888  888888
+                              88888    88    88888
+                              888888  8888  888888
+                              88888888888888888888
+                              88888888888888888888
+                             8888888888888888888888
+                          8888888888888888888888888888
+                        88888888888888888888888888888888
+                              88888888888888888888
+                            888888888888888888888888
+                           888888  8888888888  888888
+                           888     8888  8888     888
+                                   888    888
+
+                                   OCTOBANANA
+
+Licensed under the MIT License
+
+Copyright (c) 2019 Brett Robinson <https://octobanana.com/>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #include "game/world.hh"
 
 #include <unistd.h>
@@ -85,7 +130,7 @@ Main::Main(Ctx ctx) : Scene(ctx) {
 
   _focus = "snake";
 
-  auto& _env = _ctx._env;
+  auto& _env = _ctx->_env;
 
   (*_env)["key"] = Val{Fun{str_lst("(a b)"), [&](auto e) -> Xpr {
     auto a = eval(sym_xpr("a"), e);
@@ -142,7 +187,7 @@ bool Main::on_read(Read::Null const& ctx) {
 
 bool Main::on_read(Read::Mouse const& ctx) {
   if (auto const x = _input.find(ctx.ch); x != _input.end()) {
-    eval(x->second, _ctx._env);
+    eval(x->second, _ctx->_env);
     return true;
   }
   return false;
@@ -150,65 +195,71 @@ bool Main::on_read(Read::Mouse const& ctx) {
 
 bool Main::on_read(Read::Key const& ctx) {
   {
-    if (_code.empty()) {
-      // TODO store and increase total elapsed time on each tick
-      _code_begin = Clock::now();
-    }
-    _code += ctx.str;
-    if (ctx.ch == Key::Escape || _code.size() >= 64) {
-      _code.clear();
-    }
-    else if (_code == "\x1b\x5b\x41\x1b\x5b\x41\x1b\x5b\x42\x1b\x5b\x42\x1b\x5b\x44\x1b\x5b\x43\x1b\x5b\x44\x1b\x5b\x43\x62\x61") {
-      auto const now = Clock::now();
-      if (std::chrono::duration_cast<std::chrono::milliseconds>(now - _code_begin) < 3000ms) {
+    _code.erase(_code.begin());
+    _code.emplace_back(std::make_pair(ctx.ch, _ctx->_time));
+    if (_code.back().second - _code.front().second < 3000ms) {
+      if (
+          _code.at(0).first == Key::Up &&
+          _code.at(1).first == Key::Up &&
+          _code.at(2).first == Key::Down &&
+          _code.at(3).first == Key::Down &&
+          _code.at(4).first == Key::Left &&
+          _code.at(5).first == Key::Right &&
+          _code.at(6).first == Key::Left &&
+          _code.at(7).first == Key::Right &&
+          _code.at(8).first == 'b' &&
+          _code.at(9).first == 'a'
+          ) {
         auto const snake = std::dynamic_pointer_cast<Snake>(_scenes.at("snake"));
+        snake->_special_time = _ctx->_time;
         snake->_special = Snake::Rainbow;
-        // std::cerr << "code> rainbow\n";
+        snake->_hit_wall = false;
+        snake->_hit_wall_egg = false;
+        snake->_hit_wall_portal = true;
+        snake->_hit_body = false;
       }
-      // else if (std::chrono::duration_cast<std::chrono::milliseconds>(now - _code_begin) < 3000ms) {
-      //   auto const snake = std::dynamic_pointer_cast<Snake>(_scenes.at("snake"));
-      //   snake->_special = Snake::Party;
-      //   std::cerr << "code> party\n";
-      // }
-      _code.clear();
     }
   }
 
   switch (ctx.ch) {
+    case Key::Escape: {
+      auto const prompt = std::dynamic_pointer_cast<Prompt>(_scenes.at("prompt"));
+      prompt->_state = Prompt::State::Clear;
+      return true;
+    }
     case ':': {
-                _focus = "prompt";
-                auto const snake = std::dynamic_pointer_cast<Snake>(_scenes.at("snake"));
-                snake->_state = Snake::State::Stopped;
-                auto const prompt = std::dynamic_pointer_cast<Prompt>(_scenes.at("prompt"));
-                prompt->_state = Prompt::State::Typing;
-                return true;
-              }
+      _focus = "prompt";
+      auto const snake = std::dynamic_pointer_cast<Snake>(_scenes.at("snake"));
+      snake->_state = Snake::State::Stopped;
+      auto const prompt = std::dynamic_pointer_cast<Prompt>(_scenes.at("prompt"));
+      prompt->_state = Prompt::State::Typing;
+      return true;
+    }
     case 'r': {
-                _scenes.erase("snake");
-                _scenes.erase("egg");
-                _scenes("snake", std::make_shared<Snake>(_ctx));
-                _scenes("egg", std::make_shared<Egg>(_ctx));
-                on_winch(_size);
-                return true;
-              }
+      _scenes.erase("snake");
+      _scenes.erase("egg");
+      _scenes("snake", std::make_shared<Snake>(_ctx));
+      _scenes("egg", std::make_shared<Egg>(_ctx));
+      on_winch(_size);
+      return true;
+    }
     case 'R': {
-                _scenes.erase("board");
-                _scenes.erase("snake");
-                _scenes.erase("egg");
-                _scenes("board", std::make_shared<Board>(_ctx));
-                _scenes("snake", std::make_shared<Snake>(_ctx));
-                _scenes("egg", std::make_shared<Egg>(_ctx));
-                on_winch(_size);
-                return true;
-              }
+      _scenes.erase("board");
+      _scenes.erase("snake");
+      _scenes.erase("egg");
+      _scenes("board", std::make_shared<Board>(_ctx));
+      _scenes("snake", std::make_shared<Snake>(_ctx));
+      _scenes("egg", std::make_shared<Egg>(_ctx));
+      on_winch(_size);
+      return true;
+    }
   }
   if (auto const x = _input.find(ctx.ch); x != _input.end()) {
-    eval(x->second, _ctx._env);
+    eval(x->second, _ctx->_env);
     return true;
   }
   return false;
 }
-
 
 bool Main::on_update(Tick const delta) {
   for (auto const& e : _scenes) {
@@ -339,7 +390,7 @@ bool Board::on_render(Buffer& buf) {
 // Snake -----------------------------------------------------------------------
 
 Snake::Snake(Ctx ctx) : Scene(ctx) {
-  auto const& _env = _ctx._env;
+  auto const& _env = _ctx->_env;
 
   (*_env)["pause"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     switch (_state) {
@@ -355,6 +406,16 @@ Snake::Snake(Ctx ctx) : Scene(ctx) {
     return sym_xpr("T");
   }}, _env, Val::evaled};
 
+  (*_env)["fixed"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
+    if (_state == Moving) {
+      _state = Fixed;
+    }
+    else if (_state == Fixed) {
+      _state = Moving;
+    }
+    return sym_xpr("T");
+  }}, _env, Val::evaled};
+
   (*_env)["straight"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if (_state == Stopped || _dir.size() >= 8) {return sym_xpr("F");}
     if (_dir.size()) {_dir.emplace_back(_dir.back());}
@@ -364,42 +425,74 @@ Snake::Snake(Ctx ctx) : Scene(ctx) {
 
   (*_env)["up"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if (_state == Stopped || _dir.size() >= 8) {return sym_xpr("F");}
-    Dir dir;
-    if (_dir.size()) {dir = _dir.back();}
-    else {dir = _dir_prev;}
-    if (dir == Snake::Up || dir == Snake::Down) {return sym_xpr("F");}
-    _dir.emplace_back(Snake::Up);
-    return sym_xpr("T");
+    if (_state == Moving) {
+      Dir dir;
+      if (_dir.size()) {dir = _dir.back();}
+      else {dir = _dir_prev;}
+      if (dir == Snake::Up || dir == Snake::Down) {return sym_xpr("F");}
+      _dir.emplace_back(Snake::Up);
+      return sym_xpr("T");
+    }
+    if (_state == Fixed) {
+      if (_dir.size() && _dir.back() == Snake::Up) {return sym_xpr("F");}
+      _dir.emplace_back(Snake::Up);
+      return sym_xpr("T");
+    }
+    return sym_xpr("F");
   }}, _env, Val::evaled};
 
   (*_env)["down"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if (_state == Stopped || _dir.size() >= 8) {return sym_xpr("F");}
-    Dir dir;
-    if (_dir.size()) {dir = _dir.back();}
-    else {dir = _dir_prev;}
-    if (dir == Snake::Down || dir == Snake::Up) {return sym_xpr("F");}
-    _dir.emplace_back(Snake::Down);
-    return sym_xpr("T");
+    if (_state == Moving) {
+      Dir dir;
+      if (_dir.size()) {dir = _dir.back();}
+      else {dir = _dir_prev;}
+      if (dir == Snake::Down || dir == Snake::Up) {return sym_xpr("F");}
+      _dir.emplace_back(Snake::Down);
+      return sym_xpr("T");
+    }
+    if (_state == Fixed) {
+      if (_dir.size() && _dir.back() == Snake::Down) {return sym_xpr("F");}
+      _dir.emplace_back(Snake::Down);
+      return sym_xpr("T");
+    }
+    return sym_xpr("F");
   }}, _env, Val::evaled};
 
   (*_env)["left"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if (_state == Stopped || _dir.size() >= 8) {return sym_xpr("F");}
-    Dir dir;
-    if (_dir.size()) {dir = _dir.back();}
-    else {dir = _dir_prev;}
-    if (dir == Snake::Left || dir == Snake::Right) {return sym_xpr("F");}
-    _dir.emplace_back(Snake::Left);
-    return sym_xpr("T");
+    if (_state == Moving) {
+      Dir dir;
+      if (_dir.size()) {dir = _dir.back();}
+      else {dir = _dir_prev;}
+      if (dir == Snake::Left || dir == Snake::Right) {return sym_xpr("F");}
+      _dir.emplace_back(Snake::Left);
+      return sym_xpr("T");
+    }
+    if (_state == Fixed) {
+      if (_dir.size() && _dir.back() == Snake::Left) {return sym_xpr("F");}
+      _dir.emplace_back(Snake::Left);
+      return sym_xpr("T");
+    }
+    return sym_xpr("F");
   }}, _env, Val::evaled};
 
   (*_env)["right"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
     if (_state == Stopped || _dir.size() >= 8) {return sym_xpr("F");}
-    Dir dir;
-    if (_dir.size()) {dir = _dir.back();}
-    else {dir = _dir_prev;}
-    if (dir == Snake::Right || dir == Snake::Left) {return sym_xpr("F");}
-    _dir.emplace_back(Snake::Right);
-    return sym_xpr("T");
+    if (_state == Moving) {
+      Dir dir;
+      if (_dir.size()) {dir = _dir.back();}
+      else {dir = _dir_prev;}
+      if (dir == Snake::Right || dir == Snake::Left) {return sym_xpr("F");}
+      _dir.emplace_back(Snake::Right);
+      return sym_xpr("T");
+    }
+    if (_state == Fixed) {
+      if (_dir.size() && _dir.back() == Snake::Right) {return sym_xpr("F");}
+      _dir.emplace_back(Snake::Right);
+      return sym_xpr("T");
+    }
+    return sym_xpr("F");
   }}, _env, Val::evaled};
 
   (*_env)["left2"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
@@ -517,10 +610,13 @@ Snake::Snake(Ctx ctx) : Scene(ctx) {
   }}, _env, Val::evaled};
 
   _input[Key::Space] = *read("(pause)");
+  _input['1'] = *read("(snake-coil)");
+  _input['2'] = *read("(snake-reverse)");
+  _input['3'] = *read("(fixed)");
   _input[','] = *read("(left2)");
   _input['.'] = *read("(right2)");
-  _input['m'] = *read("(snake-coil)");
-  _input['n'] = *read("(snake-reverse)");
+  _input['<'] = *read("(pn (left2) (left2))");
+  _input['>'] = *read("(pn (right2) (right2))");
   _input[Key::Up] = *read("(up)");
   _input['w'] = *read("(up)");
   _input['k'] = *read("(up)");
@@ -541,7 +637,7 @@ Snake::~Snake() {
 void Snake::on_winch(Size const& size) {
   if (_init) {
     _init = false;
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("board");
+    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
     auto x = (board->_size.w - 5) / 2;
     if (x % 2) {x -= 1;}
     _sprite.emplace_front(Block{Pos{x, 0}, &_style.head, _text});
@@ -552,7 +648,7 @@ void Snake::on_winch(Size const& size) {
 bool Snake::on_input(Read::Ctx const& ctx) {
   if (auto const v = std::get_if<Key>(&ctx)) {
     if (auto const x = _input.find(v->ch); x != _input.end()) {
-      eval(x->second, _ctx._env);
+      eval(x->second, _ctx->_env);
       return true;
     }
   }
@@ -560,12 +656,30 @@ bool Snake::on_input(Read::Ctx const& ctx) {
 }
 
 bool Snake::on_update(Tick const delta) {
-  if (_special != Special::Null) {
-    _special_delta += delta;
-    while (_special_delta >= _special_interval) {
-      _special_delta -= _special_interval;
-      double const step {-100.0 / _sprite.size()};
-      _color.step(step);
+  if (_special != Special::Normal) {
+    if (_ctx->_time - _special_time > 20000ms) {
+      _special = Snake::Normal;
+      _hit_wall = false;
+      _hit_wall_egg = true;
+      _hit_wall_portal = false;
+      _hit_body = true;
+    }
+    else if (_ctx->_time - _special_time > 16000ms) {
+      _special_delta += delta;
+      while (_special_delta >= _special_interval) {
+        _special_delta -= _special_interval;
+        double const step {-100.0 / _sprite.size()};
+        _color.step(step);
+        _special ^= Flicker;
+      }
+    }
+    else {
+      _special_delta += delta;
+      while (_special_delta >= _special_interval) {
+        _special_delta -= _special_interval;
+        double const step {-100.0 / _sprite.size()};
+        _color.step(step);
+      }
     }
   }
 
@@ -584,28 +698,39 @@ bool Snake::on_update(Tick const delta) {
       }
       return true;
     }
+    case Fixed: {
+      _delta += delta;
+      if (_delta >= _interval) {
+        while (_delta >= _interval) {
+          _delta -= _interval;
+          state_fixed();
+        }
+      }
+      return true;
+    }
   }
   return false;
 }
 
 bool Snake::on_render(Buffer& buf) {
-  auto const& board = std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("board");
+  auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
 
-  if (_special != Special::Null) {
-    if (_special & Party) {
-      auto const rgb = _color.rgb();
-      for (auto it = _sprite.rbegin(); it != _sprite.rend(); ++it) {
-        buf.cursor(Pos(it->pos.x + board->_pos.x + 2, it->pos.y + board->_pos.y + 1));
-        buf(Cell{Style::Bit_24, Style::Null, Color(), Color(static_cast<std::uint8_t>(rgb.r), static_cast<std::uint8_t>(rgb.g), static_cast<std::uint8_t>(rgb.b)), std::string(it->value)});
+  if (_special != Special::Normal) {
+    if (_special & Rainbow) {
+      if (_special & Flicker) {
+        for (auto it = _sprite.rbegin(); it != _sprite.rend(); ++it) {
+          buf.cursor(Pos(it->pos.x + board->_pos.x + 2, it->pos.y + board->_pos.y + 1));
+          buf(Cell{*it->style, std::string(it->value)});
+        }
       }
-    }
-    else if (_special & Rainbow) {
-      double const step {-100.0 / _sprite.size()};
-      for (auto it = _sprite.rbegin(); it != _sprite.rend(); ++it) {
-        buf.cursor(Pos(it->pos.x + board->_pos.x + 2, it->pos.y + board->_pos.y + 1));
-        auto const rgb = _color.rgb();
-        buf(Cell{Style::Bit_24, Style::Null, Color(), Color(static_cast<std::uint8_t>(rgb.r), static_cast<std::uint8_t>(rgb.g), static_cast<std::uint8_t>(rgb.b)), std::string(it->value)});
-        _color.step(step);
+      else {
+        double const step {-100.0 / _sprite.size()};
+        for (auto it = _sprite.rbegin(); it != _sprite.rend(); ++it) {
+          buf.cursor(Pos(it->pos.x + board->_pos.x + 2, it->pos.y + board->_pos.y + 1));
+          auto const rgb = _color.rgb();
+          buf(Cell{Style::Bit_24, Style::Null, Color(), Color(static_cast<std::uint8_t>(rgb.r), static_cast<std::uint8_t>(rgb.g), static_cast<std::uint8_t>(rgb.b)), std::string(it->value)});
+          _color.step(step);
+        }
       }
     }
   }
@@ -649,7 +774,6 @@ void Snake::state_moving() {
         case Up: {head.y += 1; break;}
         case Left: {head.x -= 2; break;}
         case Right: {head.x += 2; break;}
-        break;
       }
       break;
     }
@@ -659,7 +783,6 @@ void Snake::state_moving() {
         case Down: {head.y -= 1; break;}
         case Left: {head.x -= 2; break;}
         case Right: {head.x += 2; break;}
-        break;
       }
       break;
     }
@@ -669,7 +792,6 @@ void Snake::state_moving() {
         case Left: {head.x -= 2; break;}
         case Up: {head.y += 1; break;}
         case Down: {head.y -= 1; break;}
-        break;
       }
       break;
     }
@@ -679,46 +801,45 @@ void Snake::state_moving() {
         case Right: {head.x += 2; break;}
         case Up: {head.y += 1; break;}
         case Down: {head.y -= 1; break;}
-        break;
       }
       break;
     }
   }
 
   // hit wall
-  {
-    // bool hit_wall {false};
-    // auto const& board = std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("board");
-    // if (head.x < 0 || head.x >= board->_size.w - 4 ||
-    //     head.y < 0 || head.y >= board->_size.h - 2) {
-    //   hit_wall = true;
-    // }
-    // if (hit_wall) {
-    //   std::cerr << "collide> " << "snake -> wall" << "\n";
-    //   _dir.clear();
-    //   return;
-    // }
-  }
-  {
-    // auto const& board = std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("board");
-    // if (static_cast<long>(head.x) < 0) {
-    //   head.x = board->_size.w - 5;
-    //   if (head.x % 2) {head.x -= 1;}
-    // }
-    // else if (head.x >= board->_size.w - 4) {
-    //   head.x = 0;
-    // }
-    // else if (static_cast<long>(head.y) < 0) {
-    //   head.y = board->_size.h - 3;
-    // }
-    // else if (head.y >= board->_size.h - 2) {
-    //   head.y = 0;
-    // }
-  }
-  {
+  if (_hit_wall) {
     bool hit_wall {false};
-    auto const& egg = std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("egg");
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("board");
+    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    if (head.x < 0 || head.x >= board->_size.w - 4 ||
+        head.y < 0 || head.y >= board->_size.h - 2) {
+      hit_wall = true;
+    }
+    if (hit_wall) {
+      std::cerr << "collide> " << "snake -> wall" << "\n";
+      _dir.clear();
+      return;
+    }
+  }
+  else if (_hit_wall_portal) {
+    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    if (static_cast<long>(head.x) < 0) {
+      head.x = board->_size.w - 5;
+      if (head.x % 2) {head.x -= 1;}
+    }
+    else if (head.x >= board->_size.w - 4) {
+      head.x = 0;
+    }
+    else if (static_cast<long>(head.y) < 0) {
+      head.y = board->_size.h - 3;
+    }
+    else if (head.y >= board->_size.h - 2) {
+      head.y = 0;
+    }
+  }
+  else if (_hit_wall_egg) {
+    bool hit_wall {false};
+    auto const& egg = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("egg");
+    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
     if (static_cast<long>(head.x) < 0) {
       if (head.y == egg->_pos.y) {
         head.x = board->_size.w - 5;
@@ -761,17 +882,20 @@ void Snake::state_moving() {
 
   // hit snake
   bool hit_snake {false};
-  for (auto const& cell : _sprite) {
-    if (head.x == cell.pos.x && head.y == cell.pos.y) {
-      hit_snake = true;
-      break;
+  if (_hit_body) {
+    for (auto const& cell : _sprite) {
+      if (head.x == cell.pos.x && head.y == cell.pos.y) {
+        hit_snake = true;
+        break;
+      }
+    }
+    if (hit_snake) {
+      // std::cerr << "collide> " << "snake -> snake" << "\n";
+      _dir.clear();
+      return;
     }
   }
-  if (hit_snake) {
-    // std::cerr << "collide> " << "snake -> snake" << "\n";
-    _dir.clear();
-    return;
-  }
+
   // std::size_t len_body {0};
   // for (auto it_body = _sprite.begin(); it_body != _sprite.end(); ++it_body) {
   //   ++len_body;
@@ -785,7 +909,7 @@ void Snake::state_moving() {
 
   // hit egg
   bool hit_egg {false};
-  auto& egg = *std::dynamic_pointer_cast<Egg>(std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("egg"));
+  auto& egg = *std::dynamic_pointer_cast<Egg>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("egg"));
   if (head.x == egg._pos.x && head.y == egg._pos.y) {
     hit_egg = true;
   }
@@ -811,7 +935,196 @@ void Snake::state_moving() {
     _interval -= 4ms;
     if (_interval < 60ms) {_interval = 60ms;}
     _special_interval = _interval / 4;
-    // auto& hud = *std::dynamic_pointer_cast<Hud>(_ctx._scenes.at("hud"));
+    // auto& hud = *std::dynamic_pointer_cast<Hud>(_ctx->_scenes.at("hud"));
+    // hud.score(10);
+  }
+
+  // slow down tick rate if about to collide into wall
+  {
+    // if ((head.x == 0 && dir == Snake::left) ||
+    //     (head.x == _grid_width - 1 && dir == Snake::right) ||
+    //     (head.y == 0 && dir == Snake::up) ||
+    //     (head.y == _grid_height - 1 && dir == Snake::down)) {
+    //   _tick.slow();
+    // }
+    // else {_tick.norm();}
+  }
+}
+
+void Snake::state_fixed() {
+  Pos head {_sprite.front().pos};
+  if (_dir.empty()) {return;}
+  Dir dir {_dir.front()};
+  _dir.pop_front();
+  switch (dir) {
+    case Up: {
+      if (dir == Down) {return;}
+      switch (dir) {
+        case Up: {head.y += 1; break;}
+        case Left: {head.x -= 2; break;}
+        case Right: {head.x += 2; break;}
+      }
+      break;
+    }
+    case Down: {
+      if (dir == Up) {return;}
+      switch (dir) {
+        case Down: {head.y -= 1; break;}
+        case Left: {head.x -= 2; break;}
+        case Right: {head.x += 2; break;}
+      }
+      break;
+    }
+    case Left: {
+      if (dir == Right) {return;}
+      switch (dir) {
+        case Left: {head.x -= 2; break;}
+        case Up: {head.y += 1; break;}
+        case Down: {head.y -= 1; break;}
+      }
+      break;
+    }
+    case Right: {
+      if (dir == Left) {return;}
+      switch (dir) {
+        case Right: {head.x += 2; break;}
+        case Up: {head.y += 1; break;}
+        case Down: {head.y -= 1; break;}
+      }
+      break;
+    }
+  }
+
+  // hit wall
+  if (_hit_wall) {
+    bool hit_wall {false};
+    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    if (head.x < 0 || head.x >= board->_size.w - 4 ||
+        head.y < 0 || head.y >= board->_size.h - 2) {
+      hit_wall = true;
+    }
+    if (hit_wall) {
+      std::cerr << "collide> " << "snake -> wall" << "\n";
+      _dir.clear();
+      return;
+    }
+  }
+  else if (_hit_wall_portal) {
+    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    if (static_cast<long>(head.x) < 0) {
+      head.x = board->_size.w - 5;
+      if (head.x % 2) {head.x -= 1;}
+    }
+    else if (head.x >= board->_size.w - 4) {
+      head.x = 0;
+    }
+    else if (static_cast<long>(head.y) < 0) {
+      head.y = board->_size.h - 3;
+    }
+    else if (head.y >= board->_size.h - 2) {
+      head.y = 0;
+    }
+  }
+  else if (_hit_wall_egg) {
+    bool hit_wall {false};
+    auto const& egg = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("egg");
+    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    if (static_cast<long>(head.x) < 0) {
+      if (head.y == egg->_pos.y) {
+        head.x = board->_size.w - 5;
+        if (head.x % 2) {head.x -= 1;}
+      }
+      else {
+        hit_wall = true;
+      }
+    }
+    else if (head.x >= board->_size.w - 4) {
+      if (head.y == egg->_pos.y) {
+        head.x = 0;
+      }
+      else {
+        hit_wall = true;
+      }
+    }
+    else if (static_cast<long>(head.y) < 0) {
+      if (head.x == egg->_pos.x) {
+        head.y = board->_size.h - 3;
+      }
+      else {
+        hit_wall = true;
+      }
+    }
+    else if (head.y >= board->_size.h - 2) {
+      if (head.x == egg->_pos.x) {
+        head.y = 0;
+      }
+      else {
+        hit_wall = true;
+      }
+    }
+    if (hit_wall) {
+      // std::cerr << "collide> " << "snake -> wall" << "\n";
+      _dir.clear();
+      return;
+    }
+  }
+
+  // hit snake
+  bool hit_snake {false};
+  if (_hit_body) {
+    for (auto const& cell : _sprite) {
+      if (head.x == cell.pos.x && head.y == cell.pos.y) {
+        hit_snake = true;
+        break;
+      }
+    }
+    if (hit_snake) {
+      // std::cerr << "collide> " << "snake -> snake" << "\n";
+      _dir.clear();
+      return;
+    }
+  }
+
+  // std::size_t len_body {0};
+  // for (auto it_body = _sprite.begin(); it_body != _sprite.end(); ++it_body) {
+  //   ++len_body;
+  //   if (head.x == it_body->pos.x && head.y == it_body->pos.y) {
+  //     hit_snake = true;
+  //     _ext += _sprite.size() - len_body;
+  //     _sprite.erase(it_body, _sprite.end());
+  //     break;
+  //   }
+  // }
+
+  // hit egg
+  bool hit_egg {false};
+  auto& egg = *std::dynamic_pointer_cast<Egg>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("egg"));
+  if (head.x == egg._pos.x && head.y == egg._pos.y) {
+    hit_egg = true;
+  }
+
+  if (! hit_snake) {
+    if (_ext) {
+      _ext -= 1;
+    }
+    else {
+      _sprite.pop_back();
+    }
+  }
+
+  _dir_prev = dir;
+  _sprite.emplace_front(Block{head, &_style.head, _text});
+  _sprite.at(1).style = &_style.body.at(_style.idx);
+  if (++_style.idx >= _style.body.size()) {_style.idx = 0;}
+
+  if (hit_egg) {
+    // std::cerr << "collide> " << "snake -> egg" << "\n";
+    egg.spawn();
+    _ext += 2;
+    _interval -= 4ms;
+    if (_interval < 60ms) {_interval = 60ms;}
+    _special_interval = _interval / 4;
+    // auto& hud = *std::dynamic_pointer_cast<Hud>(_ctx->_scenes.at("hud"));
     // hud.score(10);
   }
 
@@ -838,7 +1151,7 @@ Egg::~Egg() {
 void Egg::on_winch(Size const& size) {
   if (_init) {
     _init = false;
-    auto const& board = *std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("board");
+    auto const& board = *std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
     auto x = (board._size.w - 5) / 2;
     if (x % 2) {x -= 1;}
     _pos = Pos(x, (board._size.h - 2) / 2);
@@ -872,7 +1185,7 @@ bool Egg::on_update(Tick const delta) {
 }
 
 bool Egg::on_render(Buffer& buf) {
-  auto const& board = std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("board");
+  auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
 
   buf.cursor(Pos(_pos.x + board->_pos.x + 2, _pos.y + board->_pos.y + 1));
   buf(Cell{_style.body.at(_style.idx), _text});
@@ -889,8 +1202,9 @@ bool Egg::on_render(Buffer& buf) {
 }
 
 void Egg::spawn() {
-  auto const& board = *std::dynamic_pointer_cast<Board>(std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("board"));
-  auto const& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("snake"));
+  // TODO handle when egg can't spawn anywhere
+  auto const& board = *std::dynamic_pointer_cast<Board>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board"));
+  auto const& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("snake"));
   auto const is_valid = [&]() {
     for (auto const& e : snake._sprite) {
       if (_pos.x == e.pos.x && _pos.y == e.pos.y) {return false;}
@@ -908,8 +1222,8 @@ void Egg::spawn() {
 
 Prompt::Prompt(Ctx ctx) : Scene(ctx) {
   _pos = Pos(0, 0);
-  auto const& _env = _ctx._env;
-  _readline.hist_load("./history.txt"); // debug
+  auto const& _env = _ctx->_env;
+  // _readline.hist_load("./history.txt"); // debug
   // _readline.style(_color.text);
   // _readline.prompt(">", _color.prompt);
   // _readline.prompt(">");
@@ -949,7 +1263,7 @@ bool Prompt::on_input(Read::Ctx const& ctx) {
         _buf.clear();
         try {
           if (auto x = read(input)) {
-            auto v = eval(*x, _ctx._env);
+            auto v = eval(*x, _ctx->_env);
             _buf = print(v);
             _status = true;
           }
@@ -960,12 +1274,12 @@ bool Prompt::on_input(Read::Ctx const& ctx) {
         }
         _delta = 0ms;
         _state = Display;
-        std::dynamic_pointer_cast<Main>(_ctx._main)->_focus = "snake";
+        std::dynamic_pointer_cast<Main>(_ctx->_main)->_focus = "snake";
       }
       else {
         _delta = 0ms;
         _state = Clear;
-        std::dynamic_pointer_cast<Main>(_ctx._main)->_focus = "snake";
+        std::dynamic_pointer_cast<Main>(_ctx->_main)->_focus = "snake";
       }
     }
     return true;
@@ -1053,20 +1367,24 @@ bool Status::on_render(Buffer& buf) {
   }
   buf.cursor(Pos(0, 1));
   buf(Cell{_style.name, _text.name});
-  buf(Cell{_style.key, _text.fps});
-  buf(Cell{_style.val, _text.fpsv});
-  buf(Cell{_style.val, " " + std::to_string(_ctx._fps_dropped)});
-  buf(Cell{_style.key, " | DIR "});
-  buf(Cell{_style.val, _text.dir});
+  // buf(Cell{_style.key, _text.fps});
+  buf(Cell{_style.val, " " + _text.fpsv});
+  buf(Cell{_style.val, " " + std::to_string(_ctx->_fps_dropped)});
+  buf(Cell{_style.val, " " + _text.frames});
+  buf(Cell{_style.val, " " + _text.time});
+  // buf(Cell{_style.key, " | DIR "});
+  buf(Cell{_style.val, " " + _text.dir});
   return false;
 }
 
 void Status::widget_fps() {
-  _text.fpsv = std::to_string(_ctx._fps_actual);
+  _text.fpsv = std::to_string(_ctx->_fps_actual);
+  _text.frames = std::to_string(_ctx->_frames);
+  _text.time = std::to_string(_ctx->_time.count());
 }
 
 void Status::widget_dir() {
-  auto& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Main>(_ctx._main)->_scenes.at("snake"));
+  auto& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("snake"));
   switch (snake._dir_prev) {
     case Snake::Up: {
       _text.dir = _sym.up;
@@ -1115,6 +1433,8 @@ void Status::widget_dir() {
 }
 
 // Buffer -----------------------------------------------------------------------
+
+// TODO handle out of range buffer read writes
 
 void Buffer::operator()(Cell const& cell) {
   OB::Text::View view {cell.text};
@@ -1280,6 +1600,8 @@ void Game::await_signal() {
     // std::cerr << "\nEvent: " << Belle::Signal::str(sig) << "\n";
     _sig.wait();
     _timer.cancel();
+    auto const snake = std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Main>(_main)->_scenes.at("snake"));
+    snake->_state = Snake::State::Stopped;
     screen_deinit();
     kill(getpid(), SIGSTOP);
   });
@@ -1287,8 +1609,8 @@ void Game::await_signal() {
   _sig.on_signal(SIGCONT, [&](auto const& ec, auto sig) {
     // std::cerr << "\nEvent: " << Belle::Signal::str(sig) << "\n";
     _sig.wait();
-    winch();
     screen_init();
+    winch();
     _tick_begin = Clock::now();
     await_tick();
   });
@@ -1309,34 +1631,49 @@ void Game::await_read() {
 }
 
 void Game::await_tick() {
+  // TODO make fps consistent
   _tick_end = Clock::now();
-  auto const delta = std::chrono::duration_cast<Tick>(_tick_end - _tick_begin);
-  // std::cerr << "\ntick> delta : " << delta.count() << "\n";
+  auto delta = std::chrono::duration_cast<Tick>(_tick_end - _tick_begin);
+
+  // auto const end = std::chrono::time_point_cast<Tick>(_tick_end).time_since_epoch().count();
+  // auto const begin = std::chrono::time_point_cast<Tick>(_tick_begin).time_since_epoch().count();
+  // std::cerr << "tick> begin: " << begin << "\n";
+  // std::cerr << "tick> end  : " << end << "\n";
+  // std::cerr << "tick> delta: " << delta.count() << "\n";
+
+  _time += delta;
   _tick_begin = _tick_end;
   if (delta > _tick) {
+    if (delta + 1ms == _tick) {delta = _tick;}
     int const dropped {static_cast<int>((delta.count() / _tick.count())) - 1};
     _fps_dropped += dropped;
     // std::cerr << "tick> DROPPED " << dropped << " FRAMES\n";
-    // std::cerr << "tick> " << delta.count() - _tick.count() << "\n";
     _fps_actual = 1000 / delta.count();
   }
   else {
+    delta = _tick;
     _fps_actual = _fps;
   }
-  // std::cerr << "tick> next : " << std::chrono::duration_cast<Tick>(_tick - (delta % _tick)).count() << "\n";
-  _timer.expires_at(_tick_end + (_tick - (delta % _tick)));
+  // auto const next = std::chrono::duration_cast<Tick>(_tick - _tick_timer.time<Tick>() - (delta % _tick));
+  auto const next = std::chrono::duration_cast<Tick>(_tick - _tick_timer.time<Tick>());
+  // std::cerr << "tick> tick: " << _tick.count() << "\n";
+  // std::cerr << "tick> timer: " << _tick_timer.get<Tick>() << "\n";
+  // std::cerr << "tick> next : " << next.count() << "\n";
+  // std::cerr << "tick> fps  : " << _fps_actual << "\n\n";
+  _timer.expires_at(_tick_end + next);
   _timer.async_wait([&, delta](auto ec) {
     on_tick(ec, delta);
-    await_tick();
   });
 }
 
 void Game::on_tick(Belle::error_code const& ec, Tick const delta) {
+  _tick_timer.clear();
+
   if (ec) {
-    _tick_begin = (Clock::time_point::min)();
-    _tick_end = (Clock::time_point::min)();
     return;
   }
+
+  _tick_timer.start();
 
   // OB::Timer timer;
   // std::size_t total {0};
@@ -1440,6 +1777,10 @@ void Game::on_tick(Belle::error_code const& ec, Tick const delta) {
   // std::cerr << "timer> total: " << total << "\n";
 
   _buf_prev = _buf;
+
+  ++_frames;
+  _tick_timer.stop();
+  await_tick();
 }
 
 bool Game::on_read(Read::Null const& ctx) {
@@ -1498,7 +1839,7 @@ void Game::write() {
 void Game::run() {
   screen_init();
   try {
-    _main = std::make_shared<Main>(*this);
+    _main = std::make_shared<Main>(this);
     winch();
     lang_init();
     await_signal();

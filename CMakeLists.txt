@@ -46,7 +46,7 @@ SOFTWARE.
 cmake_minimum_required (VERSION 3.8 FATAL_ERROR)
 
 set (OB_TARGET "nyble")
-set (OB_VERSION "0.1.0")
+set (OB_VERSION "0.4.0")
 
 project (${OB_TARGET} VERSION ${OB_VERSION} LANGUAGES CXX)
 # set (CXX_COMPILER "clang++")
@@ -126,8 +126,8 @@ set (CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} ${OB_LINK
 
 set (OB_SOURCES
   src/main.cc
-  src/lisp.cc
   src/game/world.cc
+  src/ob/lispp.cc
   src/ob/string.cc
   src/ob/readline.cc
 )
@@ -138,6 +138,8 @@ set (OB_LINK_LIBRARIES
   pthread
   icui18n
   icuuc
+  gmp
+  mpfr
 )
 
 set (OB_INCLUDE_DIRECTORIES

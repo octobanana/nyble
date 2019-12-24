@@ -43,8 +43,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "lisp.hh"
-
+#include "ob/lispp.hh"
 #include "ob/term.hh"
 #include "ob/text.hh"
 
@@ -119,10 +118,10 @@ std::string escape(std::string str) {
         str.replace(pos++, 1, "\\?");
         break;
       }
-      case '\'': {
-        str.replace(pos++, 1, "\\'");
-        break;
-      }
+      // case '\'': {
+      //   str.replace(pos++, 1, "\\'");
+      //   break;
+      // }
       case '"': {
         str.replace(pos++, 1, "\\\"");
         break;
@@ -174,10 +173,10 @@ std::string unescape(std::string str) {
         str.replace(pos, 2, "\?");
         break;
       }
-      case '\'': {
-        str.replace(pos, 2, "'");
-        break;
-      }
+      // case '\'': {
+      //   str.replace(pos, 2, "'");
+      //   break;
+      // }
       case '"': {
         str.replace(pos, 2, "\"");
         break;

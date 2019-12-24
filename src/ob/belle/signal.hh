@@ -20,7 +20,7 @@
 
                                    OCTOBANANA
 
-Belle signal
+Belle Signal
 0.6.0 develop
 https://octobanana.com/software/belle
 

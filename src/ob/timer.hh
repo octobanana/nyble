@@ -1,3 +1,48 @@
+/*
+                                    88888888
+                                  888888888888
+                                 88888888888888
+                                8888888888888888
+                               888888888888888888
+                              888888  8888  888888
+                              88888    88    88888
+                              888888  8888  888888
+                              88888888888888888888
+                              88888888888888888888
+                             8888888888888888888888
+                          8888888888888888888888888888
+                        88888888888888888888888888888888
+                              88888888888888888888
+                            888888888888888888888888
+                           888888  8888888888  888888
+                           888     8888  8888     888
+                                   888    888
+
+                                   OCTOBANANA
+
+Licensed under the MIT License
+
+Copyright (c) 2019 Brett Robinson <https://octobanana.com/>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #ifndef OB_TIMER_HH
 #define OB_TIMER_HH
 
@@ -14,6 +59,7 @@
 namespace OB
 {
 
+template<typename Clock>
 class Timer
 {
 public:
@@ -28,7 +74,7 @@ public:
   Timer& start()
   {
     _is_running = true;
-    _start = std::chrono::high_resolution_clock::now();
+    _start = Clock::now();
 
     return *this;
   }
@@ -59,7 +105,7 @@ public:
     else
     {
       _is_running = true;
-      _start = std::chrono::high_resolution_clock::now();
+      _start = Clock::now();
     }
 
     return *this;
@@ -73,7 +119,7 @@ public:
       update();
     }
 
-    return std::chrono::duration_cast<T>(_total);
+    return std::chrono::time_point_cast<T>(_total).time_since_epoch();
   }
 
   std::tuple<int, int, int> diff(long int const sec)
@@ -136,7 +182,7 @@ public:
   void str(std::string const& str)
   {
     clear();
-    _total = std::chrono::time_point<std::chrono::high_resolution_clock>(string_to_seconds(str));
+    _total = std::chrono::time_point<Clock>(string_to_seconds(str));
   }
 
   static long int str_to_sec(std::string const& str)
@@ -309,7 +355,7 @@ private:
 
   void update()
   {
-    auto const stop = std::chrono::high_resolution_clock::now();
+    auto const stop = Clock::now();
 
     if (stop > _start)
     {
@@ -320,8 +366,8 @@ private:
   }
 
   bool _is_running {false};
-  std::chrono::time_point<std::chrono::high_resolution_clock> _start;
-  std::chrono::time_point<std::chrono::high_resolution_clock> _total;
+  std::chrono::time_point<Clock> _start;
+  std::chrono::time_point<Clock> _total;
 }; // class Timer
 
 } // namespace OB

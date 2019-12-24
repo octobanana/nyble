@@ -7,7 +7,9 @@ Click the above image to view a video of __nyble__ in action.
 
 ## Contents
 * [About](#about)
-* [Design](#design)
+  * [Getting Started](#getting-started)
+  * [Snake Skills](#snake-skills)
+  * [nyblisp](#nyblisp)
 * [Usage](#usage)
 * [Pre-Build](#pre-build)
   * [Environments](#environments)
@@ -23,59 +25,119 @@ Click the above image to view a video of __nyble__ in action.
 ## About
 __nyble__ is a take on the classic snake game, designed for the terminal using a text-based user interface (TUI).
 
-## Design
-### The Rules
-Control the snake by moving it around the playing grid, collecting eggs while avoiding walls and the body of the snake.
+### Getting Started
+Currently, when the game starts it drops you into playground mode. The game is started and paused with the `<space>` key. The snake has two control types, 2-key and 4-key. Using 2-key moves the snake either left or right relative to the current moving direction of the snakes head. 2-key is bound to the `, .` keys. Using 4-key moves the snake in the direction of the key, if the move is possible. 4-key is bound to the `<up> <down> <left> <right>`, `w a s d`, and `h j k l` keys. Quit the game by pressing `<ctrl> c`.
 
-### The Grid
-As the height of a single character is about two times its width, the playing grid uses a 2:1 ratio. This allows the grid to be square.
+To make handling the snake easier, the playing grid is checkered, and the border contains guides for both the head of the snake and the egg.
 
-The grids width must be divisible by two. If the width of the terminal is odd, subtract one from the width to make it even.
+Collecting a golden egg increases the length and speed of the snake.
 
-The grids origin is placed at the bottom left corner.  
-The coordinates of the bottom left grid position is `(0, 0)`.  
-The coordinates of the bottom right grid position is `(grid_width - 1, 0)`.  
-The coordinates of the top left grid position is `(0, grid_height - 1)`.  
-The coordinates of the top right grid position is `(grid_width - 1, grid_height - 1)`.
+The snake can travel through each of the 4 golden portals tied to the x:y position of the egg.
 
-### The Egg
-The egg is initially placed at position `((grid_width - 1) / 2, (_grid_height - 1) / 2)`.
+### Snake Skills
+Some snake skills being experimented with are:  
+* __coil__ - press `1` to coil the body of the snake to a size of 3, and then extend itself back to its previous size.
+* __reverse__ - press `2` to reverse the snakes direction, swapping the head with the tail.
+* __fixed__ - press `3` to toggle fixed movement of the snake. A direction key must be pressed or held to move the snake.
+* __???????__ - press `??????????` to enable ??????? mode, allowing the snake to ?????? ??????? ?????? ??? ????? for a short period of time.
 
-A new egg is spawned by picking a random coordinate `(random_range(0, grid_width - 1), random_range(0, grid_height - 1))`.  
-The new coordinate is then checked to make sure it doesn't match a position occupied by the snake.  
-Repeat this process until a valid coordinate is found.
+### nyblisp
+An embedded language is used to change settings and script the gameplay. Expressions can be entered at the prompt with the `:` key. The line editor has some helpful features such as parenthesis, bracket, brace, and quote autopairing. It also has an autocomplete function that can be initiated with the `<tab>` key.
 
-### The Snake
-The snakes initial direction is `up`.
+A quick intro to the language:
 
-The snakes head is initially placed at position `((grid_width - 1) / 2, 0`.
+```
+; a comment
 
-The snake uses three colours, one for its head and two for its body.  
-The two body colours are used alternatively behind the head on each update.
+; a number
+2
+-8
+4.0
+3/4
 
-When the snake collects an egg:  
-  The tail becomes fixed while the head continues to move, extending the length of the snake for n cycles.  
-  The speed of the snake is increased.  
-  The score is increased.
+; a string
+"nyble"
 
-Updating the snake consists of:  
-  Drawing the new head.  
-  Drawing a new body over the previous head position.  
-  Erasing the tail if the snake is not currently growing.
+; a symbol
+*
+map
+nyble
 
-### The Game Loop
-While the snake is alive:  
-  Determine next head position based on the snakes current direction.  
-  Check if the snake has collided with a wall.  
-  Check if the snake has collided with itself.  
-  Temporarily slow the tick rate if the snake is about to collide into a wall.  
-  Check if the snake has collected an egg.  
-  Update the snake.
+; a list
+'(1 2 3 4)
+'(1 "nyble" 2 "nyble")
+'(* 2 4)
 
-### The Asynchronous Event Loop
-Wait on a timer.  
-Wait on a signal.  
-Wait on user input.
+; a function
+(* 2 2)
+(- 8 4)
+
+; create a mutable binding
+(var x 4)
+(var x 8)
+
+; create an immutable binding
+(let name "nyble")
+(let name 8) ; error constant binding
+
+; create a function
+(fn [x] (* 2 x))
+
+; create, bind, and call a function
+(let double (fn [x] (* 2 x)))
+(double 4) ; 8
+
+; create and call an anonymous function
+((fn [x] (* 2 x)) 4) ; 8
+
+; prevent evaluation of expression
+(quote (1 2 3)) ; (1 2 3)
+'(1 2 3) ; (1 2 3)
+
+; index into list or string
+(1 "nyble") ; "y"
+(2 '(1 2 3)) ; "3"
+
+; get all but the first element in list or string
+(@ "nyble") ; "yble"
+(@ '(1 2 3)) ; (2 3)
+```
+Game specific:
+
+```
+; set frames per second (fps)
+(fps 20)
+(fps 30)
+(fps 60)
+
+; bind a key to a function
+(key "w" '(up))
+(key "s" '(down))
+(key "a" '(left))
+(key "d" '(right))
+(key "," '(left2))
+(key "." '(right2))
+
+; bind keys to handle snake u-turn
+(key "<" '(pn (left2) (left2)))
+(key ">" '(pn (right2) (right2)))
+
+; bind keys to inc/dec snake speed
+(key "[" '(snake-speed (- (snake-speed) 10)))
+(key "]" '(snake-speed (+ (snake-speed) 10)))
+
+; get the snake size
+(snake-size)
+
+; set the snake size
+(snake-size 10)
+
+; get the snake speed
+(snake-speed)
+
+; set the snake speed measured in milliseconds between each movement
+(snake-speed 200)
+```
 
 ## Usage
 View the usage and help output with the `-h|--help` flag,
@@ -101,18 +163,25 @@ any prior requirements or dependencies needed, and any third party libraries use
 
 ### Dependencies
 * __CMake__ >= 3.8
-* __Boost__ >= 1.68.0
+* __Boost__ >= 1.71.0
 * __ICU__ >= 62.1
+* __GMP__
+* __MPFR__
 * __PThread__
 
 ### Linked Libraries
 * __icui18n__ (libicui18n) part of the ICU library
 * __icuuc__ (libicuuc) part of the ICU library
 * __pthread__ (libpthread) POSIX threads library
+* __gmp__ (libgmp) arbitrary precision arithmetic library
+* __mpfr__ (libmpfr) multiple-precision floating-point arithmetic library
+* __boost_coroutine__ (libboost_coroutine) Boost coroutine library
 
 ### Included Libraries
 * [__Belle__](https://github.com/octobanana/belle):
   Asynchronous input, modified and included as `./src/ob/belle.hh`
+* [__Lispp__](https://github.com/octobanana/lispp):
+  embedded programming language, included as `./src/ob/lispp.hh` and `./src/ob/lispp.cc`
 * [__Parg__](https://github.com/octobanana/parg):
   for parsing CLI args, modified and included as `./src/ob/parg.hh`
 

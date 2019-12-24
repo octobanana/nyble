@@ -1,10 +1,55 @@
+/*
+                                    88888888
+                                  888888888888
+                                 88888888888888
+                                8888888888888888
+                               888888888888888888
+                              888888  8888  888888
+                              88888    88    88888
+                              888888  8888  888888
+                              88888888888888888888
+                              88888888888888888888
+                             8888888888888888888888
+                          8888888888888888888888888888
+                        88888888888888888888888888888888
+                              88888888888888888888
+                            888888888888888888888888
+                           888888  8888888888  888888
+                           888     8888  8888     888
+                                   888    888
+
+                                   OCTOBANANA
+
+Licensed under the MIT License
+
+Copyright (c) 2019 Brett Robinson <https://octobanana.com/>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #ifndef GAME_WORLD_HH
 #define GAME_WORLD_HH
 
-#include "lisp.hh"
 #include "ob/parg.hh"
 #include "ob/text.hh"
 #include "ob/term.hh"
+#include "ob/lispp.hh"
 #include "ob/timer.hh"
 #include "ob/color.hh"
 #include "ob/readline.hh"
@@ -22,6 +67,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <utility>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -115,12 +161,6 @@ struct Color {
 Color hex_to_rgb(std::string const& str);
 
 struct Style {
-  Style() = default;
-  Style(Style&&) = default;
-  Style(Style const&) = default;
-  ~Style() = default;
-  Style& operator=(Style&&) = default;
-  Style& operator=(Style const&) = default;
   friend std::ostream& operator<<(std::ostream& os, Style const& obj);
   enum Type : std::uint8_t {
     Bit_2 = 0,
@@ -171,7 +211,7 @@ private:
 
 class Game;
 
-using Ctx = Game&;
+using Ctx = Game*;
 
 class Scene {
 public:
@@ -267,7 +307,7 @@ public:
   bool _init {true};
   enum Dir {Up, Down, Left, Right};
   Dir _dir_prev {Up};
-  enum State {Stopped, Moving};
+  enum State {Stopped, Moving, Fixed};
   State _state {Stopped};
   std::deque<Dir> _dir;
   std::size_t _ext {2};
@@ -275,14 +315,21 @@ public:
   Tick _interval {300ms};
   std::unordered_map<char32_t, Xpr> _input;
 
-  enum Special {Null, Party, Rainbow};
-  int _special {Special::Null};
+  bool _hit_wall {false};
+  bool _hit_wall_egg {true};
+  bool _hit_wall_portal {false};
+  bool _hit_body {true};
+
+  enum Special {Normal, Rainbow, Flicker};
+  int _special {Special::Normal};
+  Tick _special_time {0ms};
   Tick _special_delta {0ms};
   Tick _special_interval {_interval / 2};
   OB::Color _color;
 
   void state_stopped();
   void state_moving();
+  void state_fixed();
 }; // class Snake
 
 class Egg : public Scene {
@@ -317,6 +364,8 @@ public:
   bool _init {true};
   Tick _delta {0ms};
   Tick _interval {150ms};
+  // enum Type {Normal, Rainbow};
+  // int _type {Type::Normal};
 
   void spawn();
 }; // class Egg
@@ -374,9 +423,11 @@ public:
   } _style;
   struct {
     std::string line {" "};
-    std::string name {" NYBLE 0.3.0 "};
+    std::string name {" NYBLE 0.4.0 "};
     std::string fps {" FPS "};
     std::string fpsv;
+    std::string frames;
+    std::string time;
     std::string dir;
   } _text;
   struct {
@@ -414,7 +465,7 @@ public:
   std::string _focus;
   std::unordered_map<char32_t, Xpr> _input;
 
-  std::string _code;
+  std::vector<std::pair<char32_t, Tick>> _code {{0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}};
   std::chrono::time_point<Clock> _code_begin {(Clock::time_point::min)()};
 }; // class Main
 
@@ -429,6 +480,8 @@ public:
   void run();
 
   std::shared_ptr<Scene> _main;
+  Tick _time {0ms};
+  std::size_t _frames {0};
   int _fps_actual {0};
   int _fps_dropped {0};
   std::shared_ptr<Env> _env {std::make_shared<Env>()};
@@ -455,12 +508,15 @@ public:
   Read _read {_io};
   Term::Mode _term_mode;
   Size _size;
+  OB::Timer<std::chrono::steady_clock> _tick_timer;
   std::chrono::time_point<Clock> _tick_begin {(Clock::time_point::min)()};
   std::chrono::time_point<Clock> _tick_end {(Clock::time_point::min)()};
   int _fps {30};
   Tick _tick {static_cast<Tick>(1000 / _fps)};
   Timer _timer {_io};
   std::unordered_map<char32_t, Xpr> _input;
+
+  // std::vector<std::vector<>> _collide;
 
   std::size_t _bsize {0};
   Buffer _buf;

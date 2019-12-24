@@ -43,12 +43,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+// TODO static link binary
+// TODO add type system
+
 #include "ob/term.hh"
 #include "ob/text.hh"
 
+// TODO find replacement with permissible licence for static linking
+#include <boost/multiprecision/gmp.hpp>
+#include <boost/multiprecision/mpfr.hpp>
+
 #include <cstdlib>
 #include <cstdint>
-
+#include <map>
 #include <list>
 #include <deque>
 #include <bitset>
@@ -73,57 +80,55 @@ SOFTWARE.
 namespace fs = std::filesystem;
 namespace iom = OB::Term::iomanip;
 namespace aec = OB::Term::ANSI_Escape_Codes;
-
 using namespace std::string_literals;
 
-struct Typ { enum {
-  Int, Rat, Flo, Num, Sym, Str, Atm, Fun, Lst, Xpr, Ukn,
-};};
-
-static const std::vector<std::string> typ_str {
-  "Int", "Rat", "Flo", "Num", "Sym", "Str", "Atm", "Fun", "Lst", "Xpr", "Ukn"
-};
-
-static const std::unordered_map<std::string, std::string> paren_begin {
-  {"(", ")"},
-  {"[", "]"},
-  {"{", "}"}
-};
-
-static const std::unordered_map<std::string, std::string> paren_end {
-  {")", "("},
-  {"]", "["},
-  {"}", "{"}
-};
+struct Typ;
+extern std::vector<std::string> typ_str;
+extern std::unordered_map<std::string, std::string> paren_begin;
+extern std::unordered_map<std::string, std::string> paren_end;
 
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 using u64 = std::uint64_t;
+
 using i8 = std::int8_t;
 using i16 = std::int16_t;
 using i32 = std::int32_t;
 using i64 = std::int64_t;
+
 using f32 = float;
 using f64 = double;
-using Int = double;
-using Rat = double;
-using Flo = double;
-using Num = std::variant<Int>;
+
+using Int = boost::multiprecision::mpz_int;
+using Rat = boost::multiprecision::mpq_rational;
+using Flo = boost::multiprecision::mpfr_float;
+using Num = std::variant<Int, Rat, Flo>;
+
 using Sym = std::string;
+
 using Str = OB::Text::String;
+
 using Atm = std::variant<Num, Sym, Str>;
+
 struct Xpr;
+
 using Lst = std::list<Xpr>;
+
 struct Env;
+
 struct Fun {
-using Fn = std::function<Xpr(std::shared_ptr<Env>)>;
+  using Fn = std::function<Xpr(std::shared_ptr<Env>)>;
   Lst args {};
   Fn fn {nullptr};
   std::shared_ptr<Env> env {nullptr};
+  std::optional<Lst::iterator> yield {std::nullopt};
+  // std::shared_ptr<std::unordered_map<std::string, Xpr>> memo {std::make_shared<std::unordered_map<std::string, Xpr>>()};
   std::shared_ptr<Env> bind(Sym const& sym, Lst& l, std::shared_ptr<Env> e);
 };
+
 struct Xpr : std::variant<Lst, Fun, Atm> {};
+
 struct Val {
   enum : u64 {
     nil = 0,
@@ -136,23 +141,46 @@ struct Val {
   std::shared_ptr<Env> env {nullptr};
   u64 ctx {nil};
 };
+
 struct Env {
-  using Inner = std::unordered_map<Sym, Val>;
+  using Inner = std::map<Sym, Val>;
   using Outer = std::shared_ptr<Env>;
   Inner inner {};
   Outer outer {nullptr};
   Outer current {nullptr};
+  std::shared_ptr<std::unordered_map<std::string, Xpr>> memo {std::make_shared<std::unordered_map<std::string, Xpr>>()};
   Env(Outer outer = nullptr, Outer current = nullptr) : outer {outer}, current {current} {}
   Val& operator[](Sym const& sym);
   std::optional<Inner::iterator> find(Sym const& sym);
   std::optional<Inner::iterator> find_inner(Sym const& sym);
   std::optional<Inner::iterator> find_outer(Sym const& sym);
   std::optional<Inner::iterator> find_current(Sym const& sym);
+  std::optional<Inner::iterator> find_current_inner(Sym const& sym);
   void dump();
   void dump_inner();
+  void list(Xpr& x);
 };
+
 using Tok = std::string;
 using Tks = std::deque<std::string>;
+
+Tks str_tks(std::string_view& str);
+Atm tok_atm(Tok const& tk);
+std::optional<Xpr> tks_xpr(Tks& ts);
+std::optional<Xpr> read(std::string_view& str);
+std::optional<Xpr> read(std::string_view&& str);
+std::size_t type(Xpr const& x);
+template<typename T> std::string print(T const& t);
+std::string show(Xpr const& x);
+std::string print(Xpr const& x);
+std::string cprint(Xpr const& x);
+bool find_sym(Xpr const& xpr, Sym const& sym);
+void resolve_sym(Xpr& xpr, Sym const& sym, Xpr const& rpl);
+Xpr eval_impl(Xpr&, std::shared_ptr<Env>);
+Xpr eval(Xpr& xr, std::shared_ptr<Env> ev);
+Xpr eval(Xpr&& xr, std::shared_ptr<Env> ev);
+void env_init(std::shared_ptr<Env> ev, int argc, char** argv);
+void repl(int argc, char** argv);
 
 #define xpr_atm(x) (std::get_if<Atm>(x))
 #define xpr_num(x) (std::get_if<Num>(std::get_if<Atm>(x)))
@@ -181,24 +209,3 @@ using Tks = std::deque<std::string>;
 #define str_xpr(x) (Xpr{Atm{Str{(x)}}})
 #define str_lst(x) std::get<Lst>(*read((x)))
 #define holds(x, y) (std::holds_alternative<y>(x))
-
-std::string plural(std::string const& str, std::string const& end, std::size_t const num);
-std::string repeat(std::size_t const num, std::string const& str);
-std::string replace(std::string str, std::string const& key, std::string const& val, std::size_t size = std::numeric_limits<std::size_t>::max());
-std::string replace(std::string str, std::vector<std::pair<std::string, std::string>> const& vals);
-std::deque<std::string> split(std::string const& str, std::string const& delim, std::size_t size = std::numeric_limits<std::size_t>::max());
-template<typename T, typename F1, typename F2> void for_each(T& t, F1 const& f1, F2 const& f2);
-Tks str_tks(std::string_view& str);
-Atm tok_atm(Tok const& tk);
-std::optional<Xpr> tks_xpr(Tks& ts);
-std::optional<Xpr> read(std::string_view& str);
-std::optional<Xpr> read(std::string_view&& str);
-std::size_t type(Xpr const& x);
-template<typename T> std::string print(T const& t);
-std::string print(Xpr const& x);
-std::string cprint(Xpr const& x);
-Xpr eval(Xpr&& xr, std::shared_ptr<Env> ev);
-Xpr eval(Xpr& xr, std::shared_ptr<Env> ev);
-Xpr eval_impl(Xpr& xr, std::shared_ptr<Env> ev);
-void env_init(std::shared_ptr<Env> ev, int argc, char** argv);
-void repl(int argc, char** argv);

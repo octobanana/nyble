@@ -60,7 +60,7 @@ namespace iom = OB::Term::iomanip;
 namespace aec = OB::Term::ANSI_Escape_Codes;
 
 int main(int argc, char** argv) {
-  // std::ios_base::sync_with_stdio(false);
+  std::ios_base::sync_with_stdio(false);
 
   Parg pg {argc, argv};
   auto const pg_status {program_info(pg)};

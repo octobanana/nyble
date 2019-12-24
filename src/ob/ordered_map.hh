@@ -21,6 +21,7 @@
                                    OCTOBANANA
 
 Licensed under the MIT License
+
 Copyright (c) 2018-2019 Brett Robinson <https://octobanana.com/>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
