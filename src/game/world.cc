@@ -640,7 +640,9 @@ void Snake::on_winch(Size const& size) {
     auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
     auto x = (board->_size.w - 5) / 2;
     if (x % 2) {x -= 1;}
-    _sprite.emplace_front(Block{Pos{x, 0}, &_style.head, _text});
+    // TODO add eyes to snake head that track egg position
+    // _sprite.emplace_front(Block{Pos{x, 0}, &_style.head, _text});
+    _sprite.emplace_front(Block{Pos{x, 0}, &_style.head, _text.head.at(Dir::Up)});
   }
   _size = size;
 }
@@ -728,7 +730,7 @@ bool Snake::on_render(Buffer& buf) {
         for (auto it = _sprite.rbegin(); it != _sprite.rend(); ++it) {
           buf.cursor(Pos(it->pos.x + board->_pos.x + 2, it->pos.y + board->_pos.y + 1));
           auto const rgb = _color.rgb();
-          buf(Cell{Style::Bit_24, Style::Null, Color(), Color(static_cast<std::uint8_t>(rgb.r), static_cast<std::uint8_t>(rgb.g), static_cast<std::uint8_t>(rgb.b)), std::string(it->value)});
+          buf(Cell{_style.head.type, _style.head.attr, _style.head.fg, Color(static_cast<std::uint8_t>(rgb.r), static_cast<std::uint8_t>(rgb.g), static_cast<std::uint8_t>(rgb.b)), std::string(it->value)});
           _color.step(step);
         }
       }
@@ -924,8 +926,10 @@ void Snake::state_moving() {
   }
 
   _dir_prev = dir;
-  _sprite.emplace_front(Block{head, &_style.head, _text});
+  // TODO add eyes to snake head that track egg position
+  _sprite.emplace_front(Block{head, &_style.head, _text.head.at(dir)});
   _sprite.at(1).style = &_style.body.at(_style.idx);
+  _sprite.at(1).value = _text.body;
   if (++_style.idx >= _style.body.size()) {_style.idx = 0;}
 
   if (hit_egg) {
@@ -1113,8 +1117,9 @@ void Snake::state_fixed() {
   }
 
   _dir_prev = dir;
-  _sprite.emplace_front(Block{head, &_style.head, _text});
+  _sprite.emplace_front(Block{head, &_style.head, _text.head.at(dir)});
   _sprite.at(1).style = &_style.body.at(_style.idx);
+  _sprite.at(1).value = _text.body;
   if (++_style.idx >= _style.body.size()) {_style.idx = 0;}
 
   if (hit_egg) {

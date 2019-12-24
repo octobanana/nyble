@@ -291,10 +291,13 @@ public:
       Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("43c7c3")},
       Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("3aaca8")}
     };
-    Style head {Style::Bit_24, Style::Null, Color(), hex_to_rgb("4feae7")};
+    Style head {Style::Bit_24, Style::Bold, hex_to_rgb("031323"), hex_to_rgb("4feae7")};
   } _style;
 
-  std::string _text {"  "};
+  struct {
+    std::vector<std::string> head {"․․", "˙˙", " ⁚", "⁚ "};
+    std::string body {"  "};
+  } _text;
 
   struct Block {
     Pos pos;
@@ -307,9 +310,9 @@ public:
   bool _init {true};
   enum Dir {Up, Down, Left, Right};
   Dir _dir_prev {Up};
+  std::deque<Dir> _dir;
   enum State {Stopped, Moving, Fixed};
   State _state {Stopped};
-  std::deque<Dir> _dir;
   std::size_t _ext {2};
   Tick _delta {0ms};
   Tick _interval {300ms};
