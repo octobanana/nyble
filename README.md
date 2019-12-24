@@ -96,7 +96,7 @@ nyble
 
 ; index into list or string
 (1 "nyble") ; "y"
-(2 '(1 2 3)) ; "3"
+(2 '(1 2 3)) ; 3
 
 ; get all but the first element in list or string
 (@ "nyble") ; "yble"
