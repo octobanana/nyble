@@ -658,6 +658,7 @@ bool Snake::on_input(Read::Ctx const& ctx) {
 }
 
 bool Snake::on_update(Tick const delta) {
+  // special animation
   if (_special != Special::Normal) {
     if (_ctx->_time - _special_time > 20000ms) {
       _special = Snake::Normal;
@@ -681,6 +682,21 @@ bool Snake::on_update(Tick const delta) {
         _special_delta -= _special_interval;
         double const step {-100.0 / _sprite.size()};
         _color.step(step);
+      }
+    }
+  }
+
+  // blink animation
+  {
+    _blink_delta += delta;
+    if (_blink_delta >= _blink_interval) {
+      while (_blink_delta >= _blink_interval) {
+        _blink_delta -= _blink_interval;
+        if (++_state_eyes_idx >= _state_eyes.size()) {
+          _state_eyes_idx = 0;
+          _state_eyes.front().second = static_cast<Tick>(random_range(4000, 8000));
+        }
+        _blink_interval = _state_eyes.at(_state_eyes_idx).second;
       }
     }
   }
@@ -711,6 +727,7 @@ bool Snake::on_update(Tick const delta) {
       return true;
     }
   }
+
   return false;
 }
 
@@ -744,6 +761,10 @@ bool Snake::on_render(Buffer& buf) {
   }
 
   auto& head = _sprite.front();
+
+  // apply blink state
+  _state_eyes.at(_state_eyes_idx).first(buf.col(Pos(head.pos.x + board->_pos.x + 2, head.pos.y + board->_pos.y + 1)));
+  _state_eyes.at(_state_eyes_idx).first(buf.col(Pos(head.pos.x + board->_pos.x + 3, head.pos.y + board->_pos.y + 1)));
 
   buf.col(Pos(head.pos.x + board->_pos.x + 2, board->_pos.y + board->_size.h - 1)).style.fg = head.style->bg;
   buf.col(Pos(head.pos.x + board->_pos.x + 3, board->_pos.y + board->_size.h - 1)).style.fg = head.style->bg;

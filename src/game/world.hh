@@ -330,6 +330,12 @@ public:
   Tick _special_interval {_interval / 2};
   OB::Color _color;
 
+  std::size_t _state_eyes_idx {0};
+  std::vector<std::pair<std::function<void(Cell&)>, Tick>> _state_eyes {{[](Cell&) {}, 3000ms}, {[](Cell& cell) {cell.style.attr = Style::Null;}, 100ms}, {[](Cell& cell) {cell.text = " ";}, 50ms}, {[](Cell& cell) {cell.style.attr = Style::Null;}, 100ms}};
+  Tick _blink_delta {0ms};
+  Tick _blink_interval {3000ms};
+
+  // TODO move duplicate code to separate function
   void state_stopped();
   void state_moving();
   void state_fixed();
