@@ -26,7 +26,7 @@ Click the above image to view a video of __nyble__ in action.
 __nyble__ is a take on the classic snake game, designed for the terminal using a text-based user interface (TUI).
 
 ### Getting Started
-Currently, when the game starts it drops you into playground mode. The game is started and paused with the `<space>` key. The snake has two control types, 2-key and 4-key. Using 2-key moves the snake either left or right relative to the current moving direction of the snakes head. 2-key is bound to the `, .` keys. Using 4-key moves the snake in the direction of the key, if the move is possible. 4-key is bound to the `<up> <down> <left> <right>`, `w a s d`, and `h j k l` keys. Quit the game by pressing `<ctrl> c`.
+Currently, when the game starts it drops you into playground mode. The game is started and paused with the `<space>` key and restarted with the `r` key. The snake has two control types, 2-key and 4-key. Using 2-key moves the snake either left or right relative to the current moving direction of the snakes head. 2-key is bound to the `, .` keys. Using 4-key moves the snake in the direction of the key, if the move is possible. 4-key is bound to the `<up> <down> <left> <right>`, `w a s d`, and `h j k l` keys. Quit the game by pressing `<ctrl> c`.
 
 To make handling the snake easier, the playing grid is checkered, and the border contains guides for both the head of the snake and the egg.
 
