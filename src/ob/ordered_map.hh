@@ -83,6 +83,8 @@ public:
   // index iterators
   using i_iterator = typename std::deque<m_iterator>::iterator;
   using i_const_iterator = typename std::deque<m_const_iterator>::const_iterator;
+  using i_reverse_iterator = typename std::deque<m_iterator>::reverse_iterator;
+  using i_const_reverse_iterator = typename std::deque<m_const_iterator>::const_reverse_iterator;
 
 
   Ordered_map()
@@ -197,6 +199,21 @@ public:
     return _it.cbegin();
   }
 
+  i_reverse_iterator rbegin()
+  {
+    return _it.rbegin();
+  }
+
+  i_const_reverse_iterator rbegin() const
+  {
+    return _it.rbegin();
+  }
+
+  i_const_reverse_iterator crbegin() const
+  {
+    return _it.crbegin();
+  }
+
   i_iterator end()
   {
     return _it.end();
@@ -210,6 +227,21 @@ public:
   i_const_iterator cend() const
   {
     return _it.cend();
+  }
+
+  i_reverse_iterator rend()
+  {
+    return _it.rend();
+  }
+
+  i_const_reverse_iterator rend() const
+  {
+    return _it.rend();
+  }
+
+  i_const_reverse_iterator crend() const
+  {
+    return _it.crend();
   }
 
   m_iterator map_begin()
