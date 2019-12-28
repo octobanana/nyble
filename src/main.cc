@@ -72,8 +72,8 @@ int main(int argc, char** argv) {
 
   try
   {
-    std::shared_ptr<Nyble::Game> game {std::make_shared<Nyble::Game>(pg)};
-    game->run();
+    std::shared_ptr<Nyble::Engine> engine {std::make_shared<Nyble::Engine>(pg)};
+    engine->run();
   }
   catch(std::exception const& e)
   {

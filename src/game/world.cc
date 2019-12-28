@@ -118,9 +118,9 @@ bool Background::on_render(Buffer& buf) {
   return false;
 }
 
-// Main -----------------------------------------------------------------------
+// Root -----------------------------------------------------------------------
 
-Main::Main(Ctx ctx) : Scene(ctx) {
+Root::Root(Ctx ctx) : Scene(ctx) {
   _scenes("background", std::make_shared<Background>(ctx));
   _scenes("status", std::make_shared<Status>(ctx));
   _scenes("prompt", std::make_shared<Prompt>(ctx));
@@ -152,10 +152,10 @@ Main::Main(Ctx ctx) : Scene(ctx) {
   }}, _env, Val::evaled};
 }
 
-Main::~Main() {
+Root::~Root() {
 }
 
-void Main::on_winch(Size const& size) {
+void Root::on_winch(Size const& size) {
   // TODO check min x,y window size
   // TODO allow fixed x,y window size
   _size = size;
@@ -167,7 +167,7 @@ void Main::on_winch(Size const& size) {
   _scenes.at("board")->on_render(_buf);
 }
 
-bool Main::on_input(Read::Ctx const& ctx) {
+bool Root::on_input(Read::Ctx const& ctx) {
   if (_focus != "prompt") {
     bool found {false};
     std::visit([&](auto const& e) {found = on_read(e);}, ctx);
@@ -180,12 +180,12 @@ bool Main::on_input(Read::Ctx const& ctx) {
   return false;
 }
 
-bool Main::on_read(Read::Null const& ctx) {
+bool Root::on_read(Read::Null const& ctx) {
   // TODO log error
   return true;
 }
 
-bool Main::on_read(Read::Mouse const& ctx) {
+bool Root::on_read(Read::Mouse const& ctx) {
   if (auto const x = _input.find(ctx.ch); x != _input.end()) {
     eval(x->second, _ctx->_env);
     return true;
@@ -193,7 +193,7 @@ bool Main::on_read(Read::Mouse const& ctx) {
   return false;
 }
 
-bool Main::on_read(Read::Key const& ctx) {
+bool Root::on_read(Read::Key const& ctx) {
   {
     _code.erase(_code.begin());
     _code.emplace_back(std::make_pair(ctx.ch, _ctx->_time));
@@ -261,7 +261,7 @@ bool Main::on_read(Read::Key const& ctx) {
   return false;
 }
 
-bool Main::on_update(Tick const delta) {
+bool Root::on_update(Tick const delta) {
   for (auto const& e : _scenes) {
     if (e->second->on_update(delta)) {
       // std::cerr << "update> " << e->first << "\n";
@@ -270,17 +270,11 @@ bool Main::on_update(Tick const delta) {
   return true;
 }
 
-bool Main::on_render(Buffer& buf) {
-  // OB::Timer timer;
-
+bool Root::on_render(Buffer& buf) {
   // for (auto const& e : _scenes) {
-  //   // timer.start();
   //   if (e->second->on_render(buf)) {
   //     // std::cerr << "render> " << e->first << "\n";
   //   }
-  //   // std::cerr << "timer> update " << e->first << ": " << timer.get<std::chrono::milliseconds>() << "\n";
-  //   // timer.stop();
-  //   // timer.clear();
   // }
 
   buf = _buf;
@@ -328,15 +322,15 @@ bool Board::on_render(Buffer& buf) {
         buf.cursor(Pos(_pos.x + x, _pos.y + y));
         if (x == 0) {
           // outer left
-          buf(Cell{_style, " └"});
+          buf(Cell{this, 0, _style, " └"});
         }
         else if (x == _size.w - 2) {
           // outer right
-          buf(Cell{_style, "┘ "});
+          buf(Cell{this, 0, _style, "┘ "});
         }
         else {
           // inner
-          buf(Cell{_style, "──"});
+          buf(Cell{this, 0, _style, "──"});
         }
       }
     }
@@ -346,15 +340,15 @@ bool Board::on_render(Buffer& buf) {
         buf.cursor(Pos(_pos.x + x, _pos.y + y));
         if (x == 0) {
           // outer left
-          buf(Cell{_style, " ┌"});
+          buf(Cell{this, 0, _style, " ┌"});
         }
         else if (x == _size.w - 2) {
           // outer right
-          buf(Cell{_style, "┐ "});
+          buf(Cell{this, 0, _style, "┐ "});
         }
         else {
           // inner
-          buf(Cell{_style, "──"});
+          buf(Cell{this, 0, _style, "──"});
         }
       }
     }
@@ -364,19 +358,19 @@ bool Board::on_render(Buffer& buf) {
         buf.cursor(Pos(_pos.x + x, _pos.y + y));
         if (x == 0) {
           // outer left
-          buf(Cell{_style, " │"});
+          buf(Cell{this, 0, _style, " │"});
         }
         else if (x == _size.w - 2) {
           // outer right
-          buf(Cell{_style, "│ "});
+          buf(Cell{this, 0, _style, "│ "});
         }
         else {
           // inner
           if (swap) {
-            buf(Cell{_block1, "  "});
+            buf(Cell{this, 0, _block1, "  "});
           }
           else {
-            buf(Cell{_block2, "  "});
+            buf(Cell{this, 0, _block2, "  "});
           }
           swap = !swap;
         }
@@ -637,11 +631,9 @@ Snake::~Snake() {
 void Snake::on_winch(Size const& size) {
   if (_init) {
     _init = false;
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
     auto x = (board->_size.w - 5) / 2;
     if (x % 2) {x -= 1;}
-    // TODO add eyes to snake head that track egg position
-    // _sprite.emplace_front(Block{Pos{x, 0}, &_style.head, _text});
     _sprite.emplace_front(Block{Pos{x, 0}, &_style.head, _text.head.at(Dir::Up)});
   }
   _size = size;
@@ -654,6 +646,29 @@ bool Snake::on_input(Read::Ctx const& ctx) {
       return true;
     }
   }
+  // else if (auto const v = std::get_if<Mouse>(&ctx)) {
+  //   // std::cerr << "mouse> snake " << v->pos.x << ":" << v->pos.y << "\n";
+  //   // scene  pos  size
+  //   // main   0:0  42:26
+  //   // board  0:2  42:24
+  //   // grid   2:1  38:22
+  //   // head  18:0   2:1
+  // auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
+  //   auto const x = v->pos.x - board->_pos.x - 2;
+  //   auto const y = v->pos.y - board->_pos.y - 1;
+  //   if (v->ch == Mouse::Press_left) {
+  //     if ((x == _sprite.front().pos.x || x == _sprite.front().pos.x + 1) && y == _sprite.front().pos.y) {
+  //       std::cerr << "mouse> snake head " << x << ":" << y << "\n";
+  //     }
+  //     else {
+  //       std::cerr << "mouse> snake body " << x << ":" << y << "\n";
+  //     }
+  //   }
+  //   if (auto const x = _input.find(v->ch); x != _input.end()) {
+  //     eval(x->second, _ctx->_env);
+  //     return true;
+  //   }
+  // }
   return false;
 }
 
@@ -732,14 +747,14 @@ bool Snake::on_update(Tick const delta) {
 }
 
 bool Snake::on_render(Buffer& buf) {
-  auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+  auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
 
   if (_special != Special::Normal) {
     if (_special & Rainbow) {
       if (_special & Flicker) {
         for (auto it = _sprite.rbegin(); it != _sprite.rend(); ++it) {
           buf.cursor(Pos(it->pos.x + board->_pos.x + 2, it->pos.y + board->_pos.y + 1));
-          buf(Cell{*it->style, std::string(it->value)});
+          buf(Cell{this, 0, *it->style, std::string(it->value)});
         }
       }
       else {
@@ -747,7 +762,7 @@ bool Snake::on_render(Buffer& buf) {
         for (auto it = _sprite.rbegin(); it != _sprite.rend(); ++it) {
           buf.cursor(Pos(it->pos.x + board->_pos.x + 2, it->pos.y + board->_pos.y + 1));
           auto const rgb = _color.rgb();
-          buf(Cell{_style.head.type, _style.head.attr, _style.head.fg, Color(static_cast<std::uint8_t>(rgb.r), static_cast<std::uint8_t>(rgb.g), static_cast<std::uint8_t>(rgb.b)), std::string(it->value)});
+          buf(Cell{this, 0, _style.head.type, _style.head.attr, _style.head.fg, Color(static_cast<std::uint8_t>(rgb.r), static_cast<std::uint8_t>(rgb.g), static_cast<std::uint8_t>(rgb.b)), std::string(it->value)});
           _color.step(step);
         }
       }
@@ -756,7 +771,7 @@ bool Snake::on_render(Buffer& buf) {
   else {
     for (auto it = _sprite.rbegin(); it != _sprite.rend(); ++it) {
       buf.cursor(Pos(it->pos.x + board->_pos.x + 2, it->pos.y + board->_pos.y + 1));
-      buf(Cell{*it->style, std::string(it->value)});
+      buf(Cell{this, 0, *it->style, std::string(it->value)});
     }
   }
 
@@ -832,19 +847,19 @@ void Snake::state_moving() {
   // hit wall
   if (_hit_wall) {
     bool hit_wall {false};
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
     if (head.x < 0 || head.x >= board->_size.w - 4 ||
         head.y < 0 || head.y >= board->_size.h - 2) {
       hit_wall = true;
     }
     if (hit_wall) {
-      std::cerr << "collide> " << "snake -> wall" << "\n";
+      // std::cerr << "collide> " << "snake -> wall" << "\n";
       _dir.clear();
       return;
     }
   }
   else if (_hit_wall_portal) {
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
     if (static_cast<long>(head.x) < 0) {
       head.x = board->_size.w - 5;
       if (head.x % 2) {head.x -= 1;}
@@ -861,8 +876,8 @@ void Snake::state_moving() {
   }
   else if (_hit_wall_egg) {
     bool hit_wall {false};
-    auto const& egg = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("egg");
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    auto const& egg = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("egg");
+    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
     if (static_cast<long>(head.x) < 0) {
       if (head.y == egg->_pos.y) {
         head.x = board->_size.w - 5;
@@ -932,7 +947,7 @@ void Snake::state_moving() {
 
   // hit egg
   bool hit_egg {false};
-  auto& egg = *std::dynamic_pointer_cast<Egg>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("egg"));
+  auto& egg = *std::dynamic_pointer_cast<Egg>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("egg"));
   if (head.x == egg._pos.x && head.y == egg._pos.y) {
     hit_egg = true;
   }
@@ -960,8 +975,6 @@ void Snake::state_moving() {
     _interval -= 4ms;
     if (_interval < 60ms) {_interval = 60ms;}
     _special_interval = _interval / 4;
-    // auto& hud = *std::dynamic_pointer_cast<Hud>(_ctx->_scenes.at("hud"));
-    // hud.score(10);
   }
 
   // slow down tick rate if about to collide into wall
@@ -1023,19 +1036,19 @@ void Snake::state_fixed() {
   // hit wall
   if (_hit_wall) {
     bool hit_wall {false};
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
     if (head.x < 0 || head.x >= board->_size.w - 4 ||
         head.y < 0 || head.y >= board->_size.h - 2) {
       hit_wall = true;
     }
     if (hit_wall) {
-      std::cerr << "collide> " << "snake -> wall" << "\n";
+      // std::cerr << "collide> " << "snake -> wall" << "\n";
       _dir.clear();
       return;
     }
   }
   else if (_hit_wall_portal) {
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
     if (static_cast<long>(head.x) < 0) {
       head.x = board->_size.w - 5;
       if (head.x % 2) {head.x -= 1;}
@@ -1052,8 +1065,8 @@ void Snake::state_fixed() {
   }
   else if (_hit_wall_egg) {
     bool hit_wall {false};
-    auto const& egg = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("egg");
-    auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    auto const& egg = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("egg");
+    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
     if (static_cast<long>(head.x) < 0) {
       if (head.y == egg->_pos.y) {
         head.x = board->_size.w - 5;
@@ -1123,7 +1136,7 @@ void Snake::state_fixed() {
 
   // hit egg
   bool hit_egg {false};
-  auto& egg = *std::dynamic_pointer_cast<Egg>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("egg"));
+  auto& egg = *std::dynamic_pointer_cast<Egg>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("egg"));
   if (head.x == egg._pos.x && head.y == egg._pos.y) {
     hit_egg = true;
   }
@@ -1150,8 +1163,6 @@ void Snake::state_fixed() {
     _interval -= 4ms;
     if (_interval < 60ms) {_interval = 60ms;}
     _special_interval = _interval / 4;
-    // auto& hud = *std::dynamic_pointer_cast<Hud>(_ctx->_scenes.at("hud"));
-    // hud.score(10);
   }
 
   // slow down tick rate if about to collide into wall
@@ -1177,7 +1188,7 @@ Egg::~Egg() {
 void Egg::on_winch(Size const& size) {
   if (_init) {
     _init = false;
-    auto const& board = *std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+    auto const& board = *std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
     auto x = (board._size.w - 5) / 2;
     if (x % 2) {x -= 1;}
     _pos = Pos(x, (board._size.h - 2) / 2);
@@ -1211,10 +1222,10 @@ bool Egg::on_update(Tick const delta) {
 }
 
 bool Egg::on_render(Buffer& buf) {
-  auto const& board = std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board");
+  auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
 
   buf.cursor(Pos(_pos.x + board->_pos.x + 2, _pos.y + board->_pos.y + 1));
-  buf(Cell{_style.body.at(_style.idx), _text});
+  buf(Cell{this, 0, _style.body.at(_style.idx), _text});
 
   buf.col(Pos(_pos.x + board->_pos.x + 2, board->_pos.y + board->_size.h - 1)).style.fg = _style.body.at(_style.idx).bg;
   buf.col(Pos(_pos.x + board->_pos.x + 3, board->_pos.y + board->_size.h - 1)).style.fg = _style.body.at(_style.idx).bg;
@@ -1229,8 +1240,8 @@ bool Egg::on_render(Buffer& buf) {
 
 void Egg::spawn() {
   // TODO handle when egg can't spawn anywhere
-  auto const& board = *std::dynamic_pointer_cast<Board>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("board"));
-  auto const& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("snake"));
+  auto const& board = *std::dynamic_pointer_cast<Board>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board"));
+  auto const& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("snake"));
   auto const is_valid = [&]() {
     for (auto const& e : snake._sprite) {
       if (_pos.x == e.pos.x && _pos.y == e.pos.y) {return false;}
@@ -1300,12 +1311,12 @@ bool Prompt::on_input(Read::Ctx const& ctx) {
         }
         _delta = 0ms;
         _state = Display;
-        std::dynamic_pointer_cast<Main>(_ctx->_main)->_focus = "snake";
+        std::dynamic_pointer_cast<Root>(_ctx->_root)->_focus = "snake";
       }
       else {
         _delta = 0ms;
         _state = Clear;
-        std::dynamic_pointer_cast<Main>(_ctx->_main)->_focus = "snake";
+        std::dynamic_pointer_cast<Root>(_ctx->_root)->_focus = "snake";
       }
     }
     return true;
@@ -1335,29 +1346,29 @@ bool Prompt::on_render(Buffer& buf) {
       if (_readline._mode == Readline::Mode::autocomplete_init || _readline._mode == Readline::Mode::autocomplete) {
         buf.cursor(Pos(_pos.x, _pos.y + 1));
         for (std::size_t x = 0; x < _size.w; ++x) {
-          buf(Cell{_style.text, " "});
+          buf(Cell{this, 0, _style.text, " "});
         }
         buf.cursor(Pos(_pos.x, _pos.y + 1));
-        buf(Cell{_style.prompt, _readline._autocomplete._lhs});
-        buf(Cell{_style.text, _readline._autocomplete._text});
+        buf(Cell{this, 0, _style.prompt, _readline._autocomplete._lhs});
+        buf(Cell{this, 0, _style.text, _readline._autocomplete._text});
         buf.cursor(Pos(_pos.x + _size.w - 1, _pos.y + 1));
-        buf(Cell{_style.prompt, _readline._autocomplete._rhs});
+        buf(Cell{this, 0, _style.prompt, _readline._autocomplete._rhs});
         for (std::size_t i = 0; i < _readline._autocomplete._hls; ++i) {
           buf.col(Pos(_readline._autocomplete._hli + i, _pos.y + 1)).style.attr |= Style::Reverse;
         }
       }
       buf.cursor(_pos);
-      buf(Cell{_style.prompt, _readline._prompt.lhs});
-      buf(Cell{_style.text, _readline._input.fmt});
-      buf(Cell{_style.prompt, _readline._prompt.rhs});
+      buf(Cell{this, 0, _style.prompt, _readline._prompt.lhs});
+      buf(Cell{this, 0, _style.text, _readline._input.fmt});
+      buf(Cell{this, 0, _style.prompt, _readline._prompt.rhs});
       buf.col(Pos(_readline._input.cur + 1, _pos.y)).style.attr |= Style::Reverse;
       return true;
     }
     case Display: {
       buf.cursor(_pos);
-      buf(Cell{_status ? _style.success : _style.error, _readline._prompt.lhs});
+      buf(Cell{this, 0, _status ? _style.success : _style.error, _readline._prompt.lhs});
       Text::View vbuf {_buf};
-      buf(Cell{_style.text, std::string(vbuf.colstr(0, _size.w - 1))});
+      buf(Cell{this, 0, _style.text, std::string(vbuf.colstr(0, _size.w - 1))});
       return true;
     }
   }
@@ -1389,17 +1400,15 @@ bool Status::on_update(Tick const delta) {
 bool Status::on_render(Buffer& buf) {
   buf.cursor(Pos(0, 1));
   for (std::size_t x = 0; x < _size.w; ++x) {
-    buf(Cell{_style.line, _text.line});
+    buf(Cell{this, 0, _style.line, _text.line});
   }
   buf.cursor(Pos(0, 1));
-  buf(Cell{_style.name, _text.name});
-  // buf(Cell{_style.key, _text.fps});
-  buf(Cell{_style.val, " " + _text.fpsv});
-  buf(Cell{_style.val, " " + std::to_string(_ctx->_fps_dropped)});
-  buf(Cell{_style.val, " " + _text.frames});
-  buf(Cell{_style.val, " " + _text.time});
-  // buf(Cell{_style.key, " | DIR "});
-  buf(Cell{_style.val, " " + _text.dir});
+  buf(Cell{this, 0, _style.name, _text.name});
+  buf(Cell{this, 0, _style.val, " " + _text.fpsv});
+  buf(Cell{this, 0, _style.val, " " + std::to_string(_ctx->_fps_dropped)});
+  buf(Cell{this, 0, _style.val, " " + _text.frames});
+  buf(Cell{this, 0, _style.val, " " + _text.time});
+  buf(Cell{this, 0, _style.val, " " + _text.dir});
   return false;
 }
 
@@ -1410,7 +1419,7 @@ void Status::widget_fps() {
 }
 
 void Status::widget_dir() {
-  auto& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Main>(_ctx->_main)->_scenes.at("snake"));
+  auto& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("snake"));
   switch (snake._dir_prev) {
     case Snake::Up: {
       _text.dir = _sym.up;
@@ -1473,7 +1482,9 @@ void Buffer::operator()(Cell const& cell) {
         }
       }
       auto& val = _value.at(_size.h - _pos.y - 1).at(_pos.x);
-      val = Cell{cell.style, std::string{e.str}};
+      if (cell.zidx >= val.zidx) {
+        val = Cell{cell.scene, cell.zidx, cell.style, std::string{e.str}};
+      }
       if (++_pos.x >= _size.w) {
         _pos.x = 0;
         if (++_pos.y >= _size.h) {
@@ -1483,7 +1494,9 @@ void Buffer::operator()(Cell const& cell) {
     }
     else {
       auto& val = _value.at(_size.h - _pos.y - 1).at(_pos.x);
-      val = Cell{cell.style, std::string{e.str}};
+      if (cell.zidx >= val.zidx) {
+        val = Cell{cell.scene, cell.zidx, cell.style, std::string{e.str}};
+      }
       if (++_pos.x >= _size.w) {
         _pos.x = 0;
         if (++_pos.y >= _size.h) {
@@ -1540,37 +1553,28 @@ void Buffer::clear() {
   _value.clear();
 }
 
-// Game ------------------------------------------------------------------------
+// Engine ------------------------------------------------------------------------
 
-Game::Game(OB::Parg& pg) : _pg {pg} {
+Engine::Engine(OB::Parg& pg) : _pg {pg} {
   _line.reserve(1000000);
-
-  // _input['q'] = *read("(quit)");
-  // _input[Term::ctrl_key('c')] = *read("(sigint)");
-  // _input[Term::ctrl_key('l')] = *read("(refresh)");
-  // _input[':'] = *read("(prompt)");
-  // _input['?'] = *read("(help)");
-
-  // _input[Key::Space] = *read("(pause)");
-  // _input['r'] = *read("(restart)");
 }
 
-void Game::start() {
+void Engine::start() {
   _io.run();
 }
 
-void Game::stop() {
+void Engine::stop() {
   _io.stop();
 }
 
-void Game::winch() {
+void Engine::winch() {
   Term::size(_size.w, _size.h);
   _buf.size(_size);
   _buf_prev = _buf;
-  _main->on_winch(_size);
+  _root->on_winch(_size);
 }
 
-void Game::screen_init() {
+void Engine::screen_init() {
   std::cout
   << aec::cursor_hide
   << aec::screen_push
@@ -1583,7 +1587,7 @@ void Game::screen_init() {
   _term_mode.set_raw();
 }
 
-void Game::screen_deinit() {
+void Engine::screen_deinit() {
   std::cout
   // << aec::focus_disable
   << aec::mouse_disable
@@ -1594,10 +1598,8 @@ void Game::screen_deinit() {
   _term_mode.set_cooked();
 }
 
-void Game::lang_init() {
+void Engine::lang_init() {
   env_init(_env, 0, nullptr);
-
-  // TODO add bindings
 
   (*_env)["fps"] = Val{Fun{str_lst("(a)"), [&](auto e) -> Xpr {
     auto x = eval(sym_xpr("a"), e);
@@ -1610,7 +1612,7 @@ void Game::lang_init() {
   }}, _env, Val::evaled};
 }
 
-void Game::await_signal() {
+void Engine::await_signal() {
   _sig.on_signal({SIGINT, SIGTERM}, [&](auto const& ec, auto sig) {
     // std::cerr << "\nEvent: " << Belle::Signal::str(sig) << "\n";
     stop();
@@ -1626,7 +1628,7 @@ void Game::await_signal() {
     // std::cerr << "\nEvent: " << Belle::Signal::str(sig) << "\n";
     _sig.wait();
     _timer.cancel();
-    auto const snake = std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Main>(_main)->_scenes.at("snake"));
+    auto const snake = std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Root>(_root)->_scenes.at("snake"));
     snake->_state = Snake::State::Stopped;
     screen_deinit();
     kill(getpid(), SIGSTOP);
@@ -1644,89 +1646,59 @@ void Game::await_signal() {
   _sig.wait();
 }
 
-void Game::await_read() {
+void Engine::await_read() {
   _read.on_read([&](auto const& ctx) {
+    auto nctx = ctx;
     bool found {false};
-    std::visit([&](auto const& e) {found = on_read(e);}, ctx);
+    std::visit([&](auto& e) {found = on_read(e);}, nctx);
     if (!found) {
-      _main->on_input(ctx);
+      if (auto const& x = std::get_if<Mouse>(&nctx)) {
+        _buf.col(Pos(x->pos.x, x->pos.y)).scene->on_input(nctx);
+      }
+      else {
+        _root->on_input(nctx);
+      }
     }
   });
 
   _read.run();
 }
 
-void Game::await_tick() {
+void Engine::await_tick() {
   // TODO make fps consistent
   _tick_end = Clock::now();
   auto delta = std::chrono::duration_cast<Tick>(_tick_end - _tick_begin);
-
-  // auto const end = std::chrono::time_point_cast<Tick>(_tick_end).time_since_epoch().count();
-  // auto const begin = std::chrono::time_point_cast<Tick>(_tick_begin).time_since_epoch().count();
-  // std::cerr << "tick> begin: " << begin << "\n";
-  // std::cerr << "tick> end  : " << end << "\n";
-  // std::cerr << "tick> delta: " << delta.count() << "\n";
-
   _time += delta;
   _tick_begin = _tick_end;
   if (delta > _tick) {
     if (delta + 1ms == _tick) {delta = _tick;}
     int const dropped {static_cast<int>((delta.count() / _tick.count())) - 1};
     _fps_dropped += dropped;
-    // std::cerr << "tick> DROPPED " << dropped << " FRAMES\n";
     _fps_actual = 1000 / delta.count();
   }
   else {
     delta = _tick;
     _fps_actual = _fps;
   }
-  // auto const next = std::chrono::duration_cast<Tick>(_tick - _tick_timer.time<Tick>() - (delta % _tick));
   auto const next = std::chrono::duration_cast<Tick>(_tick - _tick_timer.time<Tick>());
-  // std::cerr << "tick> tick: " << _tick.count() << "\n";
-  // std::cerr << "tick> timer: " << _tick_timer.get<Tick>() << "\n";
-  // std::cerr << "tick> next : " << next.count() << "\n";
-  // std::cerr << "tick> fps  : " << _fps_actual << "\n\n";
   _timer.expires_at(_tick_end + next);
   _timer.async_wait([&, delta](auto ec) {
     on_tick(ec, delta);
   });
 }
 
-void Game::on_tick(Belle::error_code const& ec, Tick const delta) {
+void Engine::on_tick(Belle::error_code const& ec, Tick const delta) {
   _tick_timer.clear();
-
-  if (ec) {
-    return;
-  }
-
+  if (ec) {return;}
   _tick_timer.start();
 
-  // OB::Timer timer;
-  // std::size_t total {0};
+  _root->on_update(delta);
+  _root->on_render(_buf);
 
-  // timer.start();
-  _main->on_update(delta);
-  // timer.stop();
-  // total += timer.get<std::chrono::milliseconds>();
-  // std::cerr << "timer> update: " << timer.get<std::chrono::milliseconds>() << "\n";
-  // timer.clear();
-
-  // timer.start();
-  _main->on_render(_buf);
-  // timer.stop();
-  // total += timer.get<std::chrono::milliseconds>();
-  // std::cerr << "timer> render: " << timer.get<std::chrono::milliseconds>() << "\n";
-  // timer.clear();
-
-  // timer.start();
   for (std::size_t y = 0; y < _buf.size().h; ++y) {
     for (std::size_t x = 0; x < _buf.size().w; ++x) {
       auto const& cell = _buf.at(Pos(x, y));
       auto const& prev = _buf_prev.at(Pos(x, y));
-
-      // std::cerr << "curr> " << _style << "\n";
-      // std::cerr << "cell> " << cell.style << "\n";
-      // std::cerr << "prev> " << prev.style << "\n";
 
       if ((cell.text != prev.text) ||
           (cell.style.attr != prev.style.attr) ||
@@ -1791,17 +1763,6 @@ void Game::on_tick(Belle::error_code const& ec, Tick const delta) {
   //   std::cerr << "write> " << _bsize << "\n";
   // }
   _bsize = 0;
-
-  // write> 151095
-  // write> 59158
-  // write> 92620
-
-  // timer.stop();
-  // total += timer.get<std::chrono::milliseconds>();
-  // std::cerr << "timer> write: " << timer.get<std::chrono::milliseconds>() << "\n";
-  // timer.clear();
-  // std::cerr << "timer> total: " << total << "\n";
-
   _buf_prev = _buf;
 
   ++_frames;
@@ -1809,12 +1770,15 @@ void Game::on_tick(Belle::error_code const& ec, Tick const delta) {
   await_tick();
 }
 
-bool Game::on_read(Read::Null const& ctx) {
+bool Engine::on_read(Read::Null& ctx) {
   // TODO log error
   return true;
 }
 
-bool Game::on_read(Read::Mouse const& ctx) {
+bool Engine::on_read(Read::Mouse& ctx) {
+  ctx.pos.x -= 1;
+  ctx.pos.y = _size.h - ctx.pos.y;
+  // std::cerr << "mouse> " << ctx.pos.x << ":" << ctx.pos.y << "\n";
   if (auto const x = _input.find(ctx.ch); x != _input.end()) {
     eval(x->second, _env);
     return true;
@@ -1822,7 +1786,7 @@ bool Game::on_read(Read::Mouse const& ctx) {
   return false;
 }
 
-bool Game::on_read(Read::Key const& ctx) {
+bool Engine::on_read(Read::Key& ctx) {
   switch (ctx.ch) {
     case OB::Term::ctrl_key('c'): {
       kill(getpid(), SIGINT);
@@ -1844,7 +1808,7 @@ bool Game::on_read(Read::Key const& ctx) {
   return false;
 }
 
-void Game::write() {
+void Engine::write() {
   if (_line.empty()) {return;}
   int num {0};
   char const* ptr {_line.data()};
@@ -1862,10 +1826,10 @@ void Game::write() {
   _line.clear();
 }
 
-void Game::run() {
-  screen_init();
+void Engine::run() {
   try {
-    _main = std::make_shared<Main>(this);
+    screen_init();
+    _root = std::make_shared<Root>(this);
     winch();
     lang_init();
     await_signal();

@@ -179,7 +179,11 @@ struct Style {
   Color bg;
 };
 
+class Scene;
+
 struct Cell {
+  Scene* scene;
+  int zidx;
   Style style;
   std::string text;
 };
@@ -209,9 +213,9 @@ private:
   std::vector<std::vector<Cell>> _value;
 }; // class Buffer
 
-class Game;
+class Engine;
 
-using Ctx = Game*;
+using Ctx = Engine*;
 
 class Scene {
 public:
@@ -247,7 +251,7 @@ public:
   bool on_render(Buffer& buf);
 
 // private:
-  Cell _cell {Style{Style::Bit_24, Style::Null, Color{}, hex_to_rgb("031323")}, " "};
+  Cell _cell {this, 0, Style{Style::Bit_24, Style::Null, Color{}, hex_to_rgb("031323")}, " "};
 }; // class Background
 
 class Board : public Scene {
@@ -450,14 +454,14 @@ public:
   void widget_dir();
 }; // class Status
 
-class Main : public Scene {
+class Root : public Scene {
 public:
-  Main(Ctx ctx);
-  Main(Main&&) = default;
-  Main(Main const&) = default;
-  ~Main();
-  Main& operator=(Main&&) = default;
-  Main& operator=(Main const&) = default;
+  Root(Ctx ctx);
+  Root(Root&&) = default;
+  Root(Root const&) = default;
+  ~Root();
+  Root& operator=(Root&&) = default;
+  Root& operator=(Root const&) = default;
   void on_winch(Size const& size);
   bool on_input(Read::Ctx const& ctx);
   bool on_update(Tick const delta);
@@ -476,19 +480,19 @@ public:
 
   std::vector<std::pair<char32_t, Tick>> _code {{0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}, {0, 0ms}};
   std::chrono::time_point<Clock> _code_begin {(Clock::time_point::min)()};
-}; // class Main
+}; // class Root
 
-class Game final {
+class Engine final {
 public:
-  Game(OB::Parg& pg);
-  Game(Game&&) = delete;
-  Game(Game const&) = delete;
-  ~Game() = default;
-  Game& operator=(Game&&) = delete;
-  Game& operator=(Game const&) = delete;
+  Engine(OB::Parg& pg);
+  Engine(Engine&&) = delete;
+  Engine(Engine const&) = delete;
+  ~Engine() = default;
+  Engine& operator=(Engine&&) = delete;
+  Engine& operator=(Engine const&) = delete;
   void run();
 
-  std::shared_ptr<Scene> _main;
+  std::shared_ptr<Scene> _root;
   Tick _time {0ms};
   std::size_t _frames {0};
   int _fps_actual {0};
@@ -506,9 +510,9 @@ public:
   void await_read();
   void await_tick();
   void on_tick(error_code const& ec, Tick const delta);
-  bool on_read(Read::Null const& ctx);
-  bool on_read(Read::Mouse const& ctx);
-  bool on_read(Read::Key const& ctx);
+  bool on_read(Read::Null& ctx);
+  bool on_read(Read::Mouse& ctx);
+  bool on_read(Read::Key& ctx);
   void write();
 
   OB::Parg& _pg;
@@ -525,14 +529,12 @@ public:
   Timer _timer {_io};
   std::unordered_map<char32_t, Xpr> _input;
 
-  // std::vector<std::vector<>> _collide;
-
   std::size_t _bsize {0};
   Buffer _buf;
   Buffer _buf_prev;
   Style _style;
   std::string _line;
-}; // class Game
+}; // class Engine
 
 }; // namespace Nyble
 
