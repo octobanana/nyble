@@ -238,7 +238,7 @@ bool Root::on_read(Read::Key const& ctx) {
       prompt->_state = Prompt::State::Clear;
       return true;
     }
-    case ':': {
+    case ':': case ';': {
       _focus = "prompt";
       auto const snake = std::dynamic_pointer_cast<Snake>(_scenes.at("snake"));
       snake->_state = Snake::State::Stopped;
