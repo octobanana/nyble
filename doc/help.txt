@@ -25,7 +25,7 @@ Key Bindings
     suspend the program
   <ctrl-l>
     force screen redraw
-  :
+  ;, :
     enter the command prompt
   <space>
     start/pause the game

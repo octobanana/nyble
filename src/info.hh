@@ -73,7 +73,7 @@ inline void program_init(OB::Parg& pg)
     {"<ctrl-c>", "quit the program"},
     {"<ctrl-z>", "suspend the program"},
     {"<ctrl-l>", "force screen redraw"},
-    {":", "enter the command prompt"},
+    {";, :", "enter the command prompt"},
     {"<space>", "start/pause the game"},
     {"r", "restart the game"},
     {"R", "restart the game and fit game window to the screen"},
