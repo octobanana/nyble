@@ -578,7 +578,7 @@ Snake::Snake(Ctx ctx) : Scene(ctx) {
       if (auto const v = xpr_int(&x)) {
         _delta = 0ms;
         _interval = static_cast<std::chrono::milliseconds>(static_cast<std::size_t>(*v));
-        if (_interval < 60ms) {_interval = 60ms;}
+        if (_interval < 100ms) {_interval = 100ms;}
         _special_interval = _interval / 4;
         return x;
       }
@@ -1019,7 +1019,7 @@ void Snake::state_moving() {
     egg.spawn();
     _ext += 2;
     _interval -= 4ms;
-    if (_interval < 60ms) {_interval = 60ms;}
+    if (_interval < 100ms) {_interval = 100ms;}
     _special_interval = _interval / 4;
   }
 
