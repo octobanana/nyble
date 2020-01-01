@@ -342,7 +342,8 @@ public:
   // TODO move duplicate code to separate function
   void state_stopped();
   void state_moving();
-  void state_fixed();
+
+  void rainbow(bool const val);
 }; // class Snake
 
 class Egg : public Scene {

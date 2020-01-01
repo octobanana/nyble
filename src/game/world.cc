@@ -211,12 +211,7 @@ bool Root::on_read(Read::Key const& ctx) {
           _code.at(9).first == 'a'
           ) {
         auto const snake = std::dynamic_pointer_cast<Snake>(_scenes.at("snake"));
-        snake->_special_time = _ctx->_time;
-        snake->_special = Snake::Rainbow;
-        snake->_hit_wall = false;
-        snake->_hit_wall_egg = false;
-        snake->_hit_wall_portal = true;
-        snake->_hit_body = false;
+        snake->rainbow(true);
       }
     }
   }
@@ -676,11 +671,7 @@ bool Snake::on_update(Tick const delta) {
   // special animation
   if (_special != Special::Normal) {
     if (_ctx->_time - _special_time > 20000ms) {
-      _special = Snake::Normal;
-      _hit_wall = false;
-      _hit_wall_egg = true;
-      _hit_wall_portal = false;
-      _hit_body = true;
+      rainbow(false);
     }
     else if (_ctx->_time - _special_time > 16000ms) {
       _special_delta += delta;
@@ -721,22 +712,12 @@ bool Snake::on_update(Tick const delta) {
       state_stopped();
       return false;
     }
-    case Moving: {
+    case Moving: case Fixed: {
       _delta += delta;
       if (_delta >= _interval) {
         while (_delta >= _interval) {
           _delta -= _interval;
           state_moving();
-        }
-      }
-      return true;
-    }
-    case Fixed: {
-      _delta += delta;
-      if (_delta >= _interval) {
-        while (_delta >= _interval) {
-          _delta -= _interval;
-          state_fixed();
         }
       }
       return true;
@@ -796,51 +777,99 @@ void Snake::state_stopped() {
 }
 
 void Snake::state_moving() {
-  Pos head {_sprite.front().pos};
+  Pos head;
   Dir dir;
-  if (_dir.size()) {
+
+  if (_state == Fixed) {
+    head = _sprite.front().pos;
+    if (_dir.empty()) {return;}
     dir = _dir.front();
     _dir.pop_front();
+    switch (dir) {
+      case Up: {
+        if (dir == Down) {return;}
+        switch (dir) {
+          case Up: {head.y += 1; break;}
+          case Left: {head.x -= 2; break;}
+          case Right: {head.x += 2; break;}
+        }
+        break;
+      }
+      case Down: {
+        if (dir == Up) {return;}
+        switch (dir) {
+          case Down: {head.y -= 1; break;}
+          case Left: {head.x -= 2; break;}
+          case Right: {head.x += 2; break;}
+        }
+        break;
+      }
+      case Left: {
+        if (dir == Right) {return;}
+        switch (dir) {
+          case Left: {head.x -= 2; break;}
+          case Up: {head.y += 1; break;}
+          case Down: {head.y -= 1; break;}
+        }
+        break;
+      }
+      case Right: {
+        if (dir == Left) {return;}
+        switch (dir) {
+          case Right: {head.x += 2; break;}
+          case Up: {head.y += 1; break;}
+          case Down: {head.y -= 1; break;}
+        }
+        break;
+      }
+    }
   }
   else {
-    dir = _dir_prev;
-  }
-  switch (_dir_prev) {
-    case Up: {
-      if (dir == Down) {dir = Up;}
-      switch (dir) {
-        case Up: {head.y += 1; break;}
-        case Left: {head.x -= 2; break;}
-        case Right: {head.x += 2; break;}
-      }
-      break;
+    head = _sprite.front().pos;
+    if (_dir.size()) {
+      dir = _dir.front();
+      _dir.pop_front();
     }
-    case Down: {
-      if (dir == Up) {dir = Down;}
-      switch (dir) {
-        case Down: {head.y -= 1; break;}
-        case Left: {head.x -= 2; break;}
-        case Right: {head.x += 2; break;}
-      }
-      break;
+    else {
+      dir = _dir_prev;
     }
-    case Left: {
-      if (dir == Right) {dir = Left;}
-      switch (dir) {
-        case Left: {head.x -= 2; break;}
-        case Up: {head.y += 1; break;}
-        case Down: {head.y -= 1; break;}
+    switch (_dir_prev) {
+      case Up: {
+        if (dir == Down) {dir = Up;}
+        switch (dir) {
+          case Up: {head.y += 1; break;}
+          case Left: {head.x -= 2; break;}
+          case Right: {head.x += 2; break;}
+        }
+        break;
       }
-      break;
-    }
-    case Right: {
-      if (dir == Left) {dir = Right;}
-      switch (dir) {
-        case Right: {head.x += 2; break;}
-        case Up: {head.y += 1; break;}
-        case Down: {head.y -= 1; break;}
+      case Down: {
+        if (dir == Up) {dir = Down;}
+        switch (dir) {
+          case Down: {head.y -= 1; break;}
+          case Left: {head.x -= 2; break;}
+          case Right: {head.x += 2; break;}
+        }
+        break;
       }
-      break;
+      case Left: {
+        if (dir == Right) {dir = Left;}
+        switch (dir) {
+          case Left: {head.x -= 2; break;}
+          case Up: {head.y += 1; break;}
+          case Down: {head.y -= 1; break;}
+        }
+        break;
+      }
+      case Right: {
+        if (dir == Left) {dir = Right;}
+        switch (dir) {
+          case Right: {head.x += 2; break;}
+          case Up: {head.y += 1; break;}
+          case Down: {head.y -= 1; break;}
+        }
+        break;
+      }
     }
   }
 
@@ -962,7 +991,6 @@ void Snake::state_moving() {
   }
 
   _dir_prev = dir;
-  // TODO add eyes to snake head that track egg position
   _sprite.emplace_front(Block{head, &_style.head, _text.head.at(dir)});
   _sprite.at(1).style = &_style.body.at(_style.idx);
   _sprite.at(1).value = _text.body;
@@ -989,191 +1017,21 @@ void Snake::state_moving() {
   }
 }
 
-void Snake::state_fixed() {
-  Pos head {_sprite.front().pos};
-  if (_dir.empty()) {return;}
-  Dir dir {_dir.front()};
-  _dir.pop_front();
-  switch (dir) {
-    case Up: {
-      if (dir == Down) {return;}
-      switch (dir) {
-        case Up: {head.y += 1; break;}
-        case Left: {head.x -= 2; break;}
-        case Right: {head.x += 2; break;}
-      }
-      break;
-    }
-    case Down: {
-      if (dir == Up) {return;}
-      switch (dir) {
-        case Down: {head.y -= 1; break;}
-        case Left: {head.x -= 2; break;}
-        case Right: {head.x += 2; break;}
-      }
-      break;
-    }
-    case Left: {
-      if (dir == Right) {return;}
-      switch (dir) {
-        case Left: {head.x -= 2; break;}
-        case Up: {head.y += 1; break;}
-        case Down: {head.y -= 1; break;}
-      }
-      break;
-    }
-    case Right: {
-      if (dir == Left) {return;}
-      switch (dir) {
-        case Right: {head.x += 2; break;}
-        case Up: {head.y += 1; break;}
-        case Down: {head.y -= 1; break;}
-      }
-      break;
-    }
+void Snake::rainbow(bool const val) {
+  if (val) {
+    _special_time = _ctx->_time;
+    _special = Snake::Rainbow;
+    _hit_wall = false;
+    _hit_wall_egg = false;
+    _hit_wall_portal = true;
+    _hit_body = false;
   }
-
-  // hit wall
-  if (_hit_wall) {
-    bool hit_wall {false};
-    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
-    if (head.x < 0 || head.x >= board->_size.w - 4 ||
-        head.y < 0 || head.y >= board->_size.h - 2) {
-      hit_wall = true;
-    }
-    if (hit_wall) {
-      // std::cerr << "collide> " << "snake -> wall" << "\n";
-      _dir.clear();
-      return;
-    }
-  }
-  else if (_hit_wall_portal) {
-    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
-    if (static_cast<long>(head.x) < 0) {
-      head.x = board->_size.w - 5;
-      if (head.x % 2) {head.x -= 1;}
-    }
-    else if (head.x >= board->_size.w - 4) {
-      head.x = 0;
-    }
-    else if (static_cast<long>(head.y) < 0) {
-      head.y = board->_size.h - 3;
-    }
-    else if (head.y >= board->_size.h - 2) {
-      head.y = 0;
-    }
-  }
-  else if (_hit_wall_egg) {
-    bool hit_wall {false};
-    auto const& egg = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("egg");
-    auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
-    if (static_cast<long>(head.x) < 0) {
-      if (head.y == egg->_pos.y) {
-        head.x = board->_size.w - 5;
-        if (head.x % 2) {head.x -= 1;}
-      }
-      else {
-        hit_wall = true;
-      }
-    }
-    else if (head.x >= board->_size.w - 4) {
-      if (head.y == egg->_pos.y) {
-        head.x = 0;
-      }
-      else {
-        hit_wall = true;
-      }
-    }
-    else if (static_cast<long>(head.y) < 0) {
-      if (head.x == egg->_pos.x) {
-        head.y = board->_size.h - 3;
-      }
-      else {
-        hit_wall = true;
-      }
-    }
-    else if (head.y >= board->_size.h - 2) {
-      if (head.x == egg->_pos.x) {
-        head.y = 0;
-      }
-      else {
-        hit_wall = true;
-      }
-    }
-    if (hit_wall) {
-      // std::cerr << "collide> " << "snake -> wall" << "\n";
-      _dir.clear();
-      return;
-    }
-  }
-
-  // hit snake
-  bool hit_snake {false};
-  if (_hit_body) {
-    for (auto const& cell : _sprite) {
-      if (head.x == cell.pos.x && head.y == cell.pos.y) {
-        hit_snake = true;
-        break;
-      }
-    }
-    if (hit_snake) {
-      // std::cerr << "collide> " << "snake -> snake" << "\n";
-      _dir.clear();
-      return;
-    }
-  }
-
-  // std::size_t len_body {0};
-  // for (auto it_body = _sprite.begin(); it_body != _sprite.end(); ++it_body) {
-  //   ++len_body;
-  //   if (head.x == it_body->pos.x && head.y == it_body->pos.y) {
-  //     hit_snake = true;
-  //     _ext += _sprite.size() - len_body;
-  //     _sprite.erase(it_body, _sprite.end());
-  //     break;
-  //   }
-  // }
-
-  // hit egg
-  bool hit_egg {false};
-  auto& egg = *std::dynamic_pointer_cast<Egg>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("egg"));
-  if (head.x == egg._pos.x && head.y == egg._pos.y) {
-    hit_egg = true;
-  }
-
-  if (! hit_snake) {
-    if (_ext) {
-      _ext -= 1;
-    }
-    else {
-      _sprite.pop_back();
-    }
-  }
-
-  _dir_prev = dir;
-  _sprite.emplace_front(Block{head, &_style.head, _text.head.at(dir)});
-  _sprite.at(1).style = &_style.body.at(_style.idx);
-  _sprite.at(1).value = _text.body;
-  if (++_style.idx >= _style.body.size()) {_style.idx = 0;}
-
-  if (hit_egg) {
-    // std::cerr << "collide> " << "snake -> egg" << "\n";
-    egg.spawn();
-    _ext += 2;
-    _interval -= 4ms;
-    if (_interval < 60ms) {_interval = 60ms;}
-    _special_interval = _interval / 4;
-  }
-
-  // slow down tick rate if about to collide into wall
-  {
-    // if ((head.x == 0 && dir == Snake::left) ||
-    //     (head.x == _grid_width - 1 && dir == Snake::right) ||
-    //     (head.y == 0 && dir == Snake::up) ||
-    //     (head.y == _grid_height - 1 && dir == Snake::down)) {
-    //   _tick.slow();
-    // }
-    // else {_tick.norm();}
+  else {
+    _special = Snake::Normal;
+    _hit_wall = false;
+    _hit_wall_egg = true;
+    _hit_wall_portal = false;
+    _hit_body = true;
   }
 }
 
