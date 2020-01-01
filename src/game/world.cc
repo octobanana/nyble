@@ -553,8 +553,10 @@ Snake::Snake(Ctx ctx) : Scene(ctx) {
   }}, _env, Val::evaled};
 
   (*_env)["snake-coil"] = Val{Fun{str_lst("()"), [&](auto e) -> Xpr {
-    _ext += _sprite.size() - 2;
-    _sprite.erase(std::next(_sprite.begin(), 3), _sprite.end());
+    if (_sprite.size() > 3) {
+      _ext += _sprite.size() - 3;
+      _sprite.erase(std::next(_sprite.begin(), 3), _sprite.end());
+    }
     return sym_xpr("T");
   }}, _env, Val::evaled};
 
