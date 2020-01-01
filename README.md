@@ -39,7 +39,7 @@ Some snake skills being experimented with are:
 * __coil__ - press `1` to coil the body of the snake to a size of 3, and then extend itself back to its previous size.
 * __reverse__ - press `2` to reverse the snakes direction, swapping the head with the tail.
 * __fixed__ - press `3` to toggle fixed movement of the snake. A direction key must be pressed or held to move the snake.
-* __???????__ - press `??????????` to enable ??????? mode, allowing the snake to ?????? ??????? ?????? ??? ????? for a short period of time.
+* __rainbow__ - collect a rainbow egg to enable rainbow mode, allowing the snake to travel through itself and walls for a short period of time.
 
 ### nyblisp
 An embedded language is used to change settings and script the gameplay. Expressions can be entered at the prompt with the `:` key. The line editor has some helpful features such as parenthesis, bracket, brace, and quote autopairing. It also has an autocomplete function that can be initiated with the `<tab>` key.

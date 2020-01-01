@@ -362,24 +362,22 @@ public:
 // private:
 
   struct Styles {
-    enum Dir {Up, Down};
-    Dir dir {Up};
+    enum Type {Normal, Rainbow};
+    Type type {Normal};
+    std::vector<OB::Color> color_map {{"#c8c213"}, {}};
+    enum Dir {Darken, Lighten};
+    Dir dir {Lighten};
     std::size_t idx {0};
-    std::vector<Style> body {
-      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("f7ff57")},
-      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("d8df4c")},
-      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("c6cc45")},
-      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("b3b93f")},
-      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("a2a739")},
-      Style{Style::Bit_24, Style::Null, Color(), hex_to_rgb("909533")}
-    };
+    std::size_t max {20};
+    OB::Color color {"#c8c213"};
+    Style style {Style::Bit_24, Style::Null, Color(), Color()};
   } _style;
   std::string _text {"  "};
   bool _init {true};
   Tick _delta {0ms};
-  Tick _interval {150ms};
-  // enum Type {Normal, Rainbow};
-  // int _type {Type::Normal};
+  Tick _interval {0ms};
+  Tick _duration {2000ms};
+  std::size_t count {0};
 
   void spawn();
 }; // class Egg

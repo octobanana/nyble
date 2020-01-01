@@ -1016,6 +1016,9 @@ void Snake::state_moving() {
 
   if (hit_egg) {
     // std::cerr << "collide> " << "snake -> egg" << "\n";
+    if (egg._style.type == Egg::Styles::Rainbow) {
+      rainbow(true);
+    }
     egg.spawn();
     _ext += 2;
     _interval -= 4ms;
@@ -1056,6 +1059,11 @@ void Snake::rainbow(bool const val) {
 // Egg -----------------------------------------------------------------------
 
 Egg::Egg(Ctx ctx) : Scene(ctx) {
+  _interval = std::chrono::duration_cast<Tick>((_duration / 2) / _style.max);
+  _style.color = _style.color_map.at(_style.type);
+  _style.color.lum(30);
+  auto const rgb = _style.color.rgb();
+  _style.style.bg = Color(rgb.r, rgb.g, rgb.b);
 }
 
 Egg::~Egg() {
@@ -1080,17 +1088,25 @@ bool Egg::on_update(Tick const delta) {
   if (_delta >= _interval) {
     while (_delta >= _interval) {
       _delta -= _interval;
-      if (_style.dir == Styles::Up) {
-        if (++_style.idx == _style.body.size()) {
-          _style.dir = Styles::Down;
-          _style.idx -= 2;
-        }
+      if (_style.type == Styles::Rainbow) {
+        _style.color.step(1);
       }
       else {
-        if (--_style.idx == 0) {
-          _style.dir = Styles::Up;
+        if (_style.dir == Styles::Lighten) {
+          if (++_style.idx == _style.max) {
+            _style.dir = Styles::Darken;
+          }
+          _style.color.lum(_style.color.lum() + 1);
+        }
+        else {
+          if (--_style.idx == 0) {
+            _style.dir = Styles::Lighten;
+          }
+          _style.color.lum(_style.color.lum() - 1);
         }
       }
+      auto const rgb = _style.color.rgb();
+      _style.style.bg = Color(rgb.r, rgb.g, rgb.b);
     }
     return true;
   }
@@ -1100,16 +1116,19 @@ bool Egg::on_update(Tick const delta) {
 bool Egg::on_render(Buffer& buf) {
   auto const& board = std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board");
 
+  // egg
   buf.cursor(Pos(_pos.x + board->_pos.x + 2, _pos.y + board->_pos.y + 1));
-  buf(Cell{this, 0, _style.body.at(_style.idx), _text});
+  buf(Cell{this, 0, _style.style, _text});
 
-  buf.col(Pos(_pos.x + board->_pos.x + 2, board->_pos.y + board->_size.h - 1)).style.fg = _style.body.at(_style.idx).bg;
-  buf.col(Pos(_pos.x + board->_pos.x + 3, board->_pos.y + board->_size.h - 1)).style.fg = _style.body.at(_style.idx).bg;
-  buf.col(Pos(_pos.x + board->_pos.x + 2, board->_pos.y)).style.fg = _style.body.at(_style.idx).bg;
-  buf.col(Pos(_pos.x + board->_pos.x + 3, board->_pos.y)).style.fg = _style.body.at(_style.idx).bg;
+  // border x-axis
+  buf.col(Pos(_pos.x + board->_pos.x + 2, board->_pos.y + board->_size.h - 1)).style.fg = _style.style.bg;
+  buf.col(Pos(_pos.x + board->_pos.x + 3, board->_pos.y + board->_size.h - 1)).style.fg = _style.style.bg;
+  buf.col(Pos(_pos.x + board->_pos.x + 2, board->_pos.y)).style.fg = _style.style.bg;
+  buf.col(Pos(_pos.x + board->_pos.x + 3, board->_pos.y)).style.fg = _style.style.bg;
 
-  buf.col(Pos(board->_pos.x + 1, _pos.y + board->_pos.y + 1)).style.fg = _style.body.at(_style.idx).bg;
-  buf.col(Pos(board->_pos.x + board->_size.w - 2, _pos.y + board->_pos.y + 1)).style.fg = _style.body.at(_style.idx).bg;
+  // border y-axis
+  buf.col(Pos(board->_pos.x + 1, _pos.y + board->_pos.y + 1)).style.fg = _style.style.bg;
+  buf.col(Pos(board->_pos.x + board->_size.w - 2, _pos.y + board->_pos.y + 1)).style.fg = _style.style.bg;
 
   return true;
 }
@@ -1117,7 +1136,7 @@ bool Egg::on_render(Buffer& buf) {
 void Egg::spawn() {
   // TODO handle when egg can't spawn anywhere
   auto const& board = *std::dynamic_pointer_cast<Board>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("board"));
-  auto const& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("snake"));
+  auto& snake = *std::dynamic_pointer_cast<Snake>(std::dynamic_pointer_cast<Root>(_ctx->_root)->_scenes.at("snake"));
   auto const is_valid = [&]() {
     for (auto const& e : snake._sprite) {
       if (_pos.x == e.pos.x && _pos.y == e.pos.y) {return false;}
@@ -1129,6 +1148,25 @@ void Egg::spawn() {
     if (_pos.x % 2) {_pos.x -= 1;}
   }
   while (!is_valid());
+
+  if (++count % 10 == 0 || random_range(0, 100) < 8) {
+    _style.type = Styles::Rainbow;
+    _delta = 0ms;
+    _style.idx = 0;
+    _style.dir = Styles::Lighten;
+    _style.color = _style.color_map.at(_style.type);
+  }
+  else {
+    _style.type = Styles::Normal;
+    _delta = 0ms;
+    _style.idx = 0;
+    _style.dir = Styles::Lighten;
+    _style.color = _style.color_map.at(_style.type);
+    _style.color.lum(30);
+  }
+
+  auto const rgb = _style.color.rgb();
+  _style.style.bg = Color(rgb.r, rgb.g, rgb.b);
 }
 
 // Prompt -----------------------------------------------------------------------
