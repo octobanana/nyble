@@ -78,6 +78,22 @@ std::size_t random_range(std::size_t l, std::size_t u) {
   return distr(gen);
 }
 
+std::string hex_encode(std::string_view const str) {
+  char buf[3];
+  std::string res;
+  for (auto const& ch : str) {
+    if (ch & 0x80) {
+      std::snprintf(&buf[0], 3, "%02X", static_cast<unsigned int>(ch & 0xff));
+    }
+    else {
+      std::snprintf(&buf[0], 3, "%02X", static_cast<unsigned int>(ch));
+    }
+    res += buf;
+  }
+  return res;
+}
+
+
 std::uint8_t hex_decode(std::string const& s) {
   unsigned int n;
   std::sscanf(s.data(), "%x", &n);
@@ -1630,6 +1646,7 @@ void Engine::on_tick(Belle::error_code const& ec, Tick const delta) {
 
 bool Engine::on_read(Read::Null& ctx) {
   // TODO log error
+  // std::cerr << "read> null: " << hex_encode(ctx.str) << "\n";
   return true;
 }
 
@@ -1645,6 +1662,7 @@ bool Engine::on_read(Read::Mouse& ctx) {
 }
 
 bool Engine::on_read(Read::Key& ctx) {
+  // std::cerr << "read>  key: " << hex_encode(ctx.str) << "\n";
   switch (ctx.ch) {
     case OB::Term::ctrl_key('c'): {
       kill(getpid(), SIGINT);
