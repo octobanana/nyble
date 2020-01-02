@@ -435,7 +435,7 @@ public:
   } _style;
   struct {
     std::string line {" "};
-    std::string name {" NYBLE 0.4.0 "};
+    std::string name {" NYBLE 0.5.0 "};
     std::string fps {" FPS "};
     std::string fpsv;
     std::string frames;

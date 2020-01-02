@@ -61,7 +61,7 @@ inline void program_init(OB::Parg& pg);
 
 inline void program_init(OB::Parg& pg)
 {
-  pg.name("nyble").version("0.4.0 (22.12.2019)");
+  pg.name("nyble").version("0.5.0 (01.01.2020)");
   pg.description("A snake game for the terminal.");
 
   pg.usage("");
