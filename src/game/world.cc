@@ -718,7 +718,7 @@ bool Snake::on_update(Tick const delta) {
         _blink_delta -= _blink_interval;
         if (++_state_eyes_idx >= _state_eyes.size()) {
           _state_eyes_idx = 0;
-          _state_eyes.front().second = static_cast<Tick>(random_range(4000, 8000));
+          _state_eyes.front().second = static_cast<Tick>(random_range(4, 8) * 1000000000);
         }
         _blink_interval = _state_eyes.at(_state_eyes_idx).second;
       }
@@ -1329,7 +1329,7 @@ bool Status::on_render(Buffer& buf) {
 void Status::widget_fps() {
   _text.fpsv = std::to_string(_ctx->_fps_actual);
   _text.frames = std::to_string(_ctx->_frames);
-  _text.time = std::to_string(_ctx->_time.count());
+  _text.time = std::to_string(std::chrono::duration_cast<std::chrono::seconds>(_ctx->_time).count());
 }
 
 void Status::widget_dir() {
@@ -1519,7 +1519,7 @@ void Engine::lang_init() {
     auto x = eval(sym_xpr("a"), e);
     if (auto const v = xpr_int(&x)) {
       _fps = static_cast<int>(*v);
-      _tick = static_cast<Tick>(1000 / _fps);
+      _tick = static_cast<Tick>(1000000000 / _fps);
       return x;
     }
     throw std::runtime_error("expected 'Int'");
@@ -1579,32 +1579,34 @@ void Engine::await_read() {
 }
 
 void Engine::await_tick() {
-  // TODO make fps consistent
+  auto const delta = std::chrono::duration_cast<Tick>(_tick - _tick_timer.time<Tick>());
+  if (delta >= 0ms) {
+    _timer.expires_at(_tick_timer.end() + delta);
+  }
+  else {
+    _timer.expires_at(_tick_timer.end() + (_tick - (_tick_timer.time<Tick>() % _tick)));
+  }
+  _timer.async_wait([&](auto ec) {
+    if (ec) {return;}
+    on_tick();
+  });
+}
+
+void Engine::on_tick() {
   _tick_end = Clock::now();
   auto delta = std::chrono::duration_cast<Tick>(_tick_end - _tick_begin);
   _time += delta;
   _tick_begin = _tick_end;
+  if (delta.count() > 0) {
+    _fps_actual = std::round(1000000000.0 / delta.count());
+  }
   if (delta > _tick) {
-    if (delta + 1ms == _tick) {delta = _tick;}
     int const dropped {static_cast<int>((delta.count() / _tick.count())) - 1};
     _fps_dropped += dropped;
-    _fps_actual = 1000 / delta.count();
   }
-  else {
-    delta = _tick;
-    _fps_actual = _fps;
-  }
-  auto const next = std::chrono::duration_cast<Tick>(_tick - _tick_timer.time<Tick>());
-  _timer.expires_at(_tick_end + next);
-  _timer.async_wait([&, delta](auto ec) {
-    on_tick(ec, delta);
-  });
-}
 
-void Engine::on_tick(Belle::error_code const& ec, Tick const delta) {
   _tick_timer.clear();
-  if (ec) {return;}
-  _tick_timer.start();
+  _tick_timer.start(_tick_begin);
 
   _root->on_update(delta);
   _root->on_render(_buf);

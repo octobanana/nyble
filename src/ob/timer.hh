@@ -76,6 +76,19 @@ public:
     _is_running = true;
     _start = Clock::now();
 
+    if (_begin != (Clock::time_point::min)())
+    {
+      _begin = _start;
+    }
+
+    return *this;
+  }
+
+  Timer& start(std::chrono::time_point<Clock> const& now)
+  {
+    _is_running = true;
+    _start = now;
+
     return *this;
   }
 
@@ -91,6 +104,8 @@ public:
   {
     _is_running = false;
     _total = {};
+    _begin = (Clock::time_point::min)();
+    _end = (Clock::time_point::min)();
 
     return *this;
   }
@@ -99,16 +114,24 @@ public:
   {
     if (_is_running)
     {
-      update();
-      _is_running = false;
+      stop();
     }
     else
     {
-      _is_running = true;
-      _start = Clock::now();
+      start();
     }
 
     return *this;
+  }
+
+  std::chrono::time_point<Clock> begin()
+  {
+    return _begin;
+  }
+
+  std::chrono::time_point<Clock> end()
+  {
+    return _end;
   }
 
   template<typename T>
@@ -356,6 +379,7 @@ private:
   void update()
   {
     auto const stop = Clock::now();
+    _end = stop;
 
     if (stop > _start)
     {
@@ -366,8 +390,10 @@ private:
   }
 
   bool _is_running {false};
-  std::chrono::time_point<Clock> _start;
-  std::chrono::time_point<Clock> _total;
+  std::chrono::time_point<Clock> _start {(Clock::time_point::min)()};;
+  std::chrono::time_point<Clock> _total {(Clock::time_point::min)()};;
+  std::chrono::time_point<Clock> _begin {(Clock::time_point::min)()};
+  std::chrono::time_point<Clock> _end {(Clock::time_point::min)()};
 }; // class Timer
 
 } // namespace OB

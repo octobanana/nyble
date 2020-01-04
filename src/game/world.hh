@@ -76,37 +76,12 @@ SOFTWARE.
 #include <functional>
 #include <unordered_map>
 
-// Root <- events
-// scenes
-//   menu
-//     objects
-//       UI
-//   game
-//     state
-//       start
-//       pause
-//       over
-//       play
-//     objects
-//       UI
-//       Board
-//       Snake
-//       Egg
-
-// on_winch
-// on_input
-// on_update
-// on_render
-//   full
-//   update
-//   patch
-
 namespace Nyble {
 
 using Read = OB::Belle::IO::Read;
 using Key = OB::Belle::IO::Read::Key;
 using Mouse = OB::Belle::IO::Read::Mouse;
-using Tick = std::chrono::milliseconds;
+using Tick = std::chrono::nanoseconds;
 using Clock = std::chrono::steady_clock;
 using Readline = OB::Readline;
 using Timer = OB::Belle::asio::steady_timer;
@@ -508,7 +483,7 @@ public:
   void await_signal();
   void await_read();
   void await_tick();
-  void on_tick(error_code const& ec, Tick const delta);
+  void on_tick();
   bool on_read(Read::Null& ctx);
   bool on_read(Read::Mouse& ctx);
   bool on_read(Read::Key& ctx);
@@ -524,7 +499,7 @@ public:
   std::chrono::time_point<Clock> _tick_begin {(Clock::time_point::min)()};
   std::chrono::time_point<Clock> _tick_end {(Clock::time_point::min)()};
   int _fps {30};
-  Tick _tick {static_cast<Tick>(1000 / _fps)};
+  Tick _tick {static_cast<Tick>(1000000000 / _fps)};
   Timer _timer {_io};
   std::unordered_map<char32_t, Xpr> _input;
 
